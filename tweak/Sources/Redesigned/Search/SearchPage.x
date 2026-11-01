@@ -17,12 +17,13 @@
 // label's, so it follows the app's language.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Kit/SGRRing.h"
 #import "Search.h"
 
 // Layout passes without the header before that is logged.
 static const NSUInteger kMissesLogged = 60;
 
-static char kTitleKey;
+static char kTitleKey, kRingKey;
 
 static __weak UICollectionView *sg_list;
 static __weak UIStackView *sg_row;
@@ -115,6 +116,15 @@ static void layoutHeader(UIStackView *row) {
         [row setNeedsLayout];
     }
     [row layoutIfNeeded];
+
+    // The avatar wears the same turning ring as the Home pill (Kit/SGRRing.h): one circle round it, the
+    // width of its own bounds, and none at all when there is no avatar to wear it.
+    if (face) {
+        CGRect ring = CGRectInset(face.frame, -1, -1);
+        SGRRingApply(row, &kRingKey, ring, MIN(ring.size.width, ring.size.height) / 2);
+    } else {
+        SGRRingApply(row, &kRingKey, CGRectZero, 0);
+    }
 
     UILabel *title = titleIn(row);
     if (![title.text isEqualToString:text]) {

@@ -28,6 +28,7 @@
 #import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/LockScreenArtwork/LockScreenArtwork.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/PlayerSettings.h"
 #import "Shared/Haptics/Haptics.h"
 #import "App/About/About.h"

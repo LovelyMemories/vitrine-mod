@@ -15,6 +15,9 @@ on:
 
 env:
   THEOS: ${{ github.workspace }}/theos
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
 
 jobs:
   build:
@@ -25,53 +28,58 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # A checkout made from a Windows machine loses the executable bit, and make release starts
-      # ./scripts/pipeline.sh and the build calls the rest of scripts/ directly.
-      - name: Make the scripts executable
-        run: chmod +x scripts/*.sh scripts/*.py
-
-      - uses: levibostian/action-hide-sensitive-inputs@v1
-
-      - uses: maxim-lobanov/setup-xcode@v1
+      # Homebrew's bottles and pip's wheels carry over between runs; the key follows this file, so changing the
+      # tools asks for a fresh cache once and then keeps it.
+      - name: Cache the tools
+        uses: actions/cache@v4
         with:
-          xcode-version: latest-stable
+          path: |
+            ~/Library/Caches/Homebrew
+            ~/.cache/pip
+          key: ${{ runner.os }}-tools-${{ hashFiles('.github/workflows/build-ipa.yml') }}
 
-      - uses: actions/checkout@v5
-        with:
-          repository: theos/theos
-          path: theos
-          submodules: recursive
-
-      # Apart, and each with a limit of its own: a brew that cannot reach its bottles is the step that hangs, and
-      # the log then says which of the two it was instead of stopping at the last line of one long step.
-      - name: Install tools (brew)
-        timeout-minutes: 20
+      # One step, with its own echoes, rather than four: the log still says which part it was on, and the job no
+      # longer pays for a step transition between each. The executable bit is on this list because a checkout made
+      # from a Windows machine loses it, and make release starts ./scripts/pipeline.sh and calls the rest directly.
+      #
+      # Theos is a shallow clone: the full recursive one is minutes of the job and nothing here reads its history.
+      # Xcode needs no setup, macos-latest already has the current stable selected.
+      - name: Install tools
+        timeout-minutes: 25
         run: |
-          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+          echo "==> xcode: $(xcodebuild -version | head -1)"
+          echo "==> scripts"
+          chmod +x scripts/*.sh scripts/*.py
+          echo "==> brew"
           brew install make dpkg ldid
+          echo "==> pyzule"
+          python3 -m pip install --break-system-packages git+https://github.com/asdfzxcvbn/pyzule-rw.git
+          echo "==> theos"
+          git clone --depth 1 --recurse-submodules --shallow-submodules --jobs 8 https://github.com/theos/theos.git "$THEOS"
 
-      - name: Install tools (pyzule)
-        timeout-minutes: 10
-        run: python3 -m pip install --break-system-packages git+https://github.com/asdfzxcvbn/pyzule-rw.git
-
+      # The URL goes through the environment, not through the step's command line, so the log never shows it and
+      # the masking action this workflow used to run is not needed.
       - name: Download IPA
         timeout-minutes: 15
+        env:
+          IPA_URL: ${{ inputs.ipa_url }}
         run: |
           mkdir -p ipa
-          curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 900 \
-            "${{ inputs.ipa_url }}" -o ipa/spotify.ipa
+          curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 900 "$IPA_URL" -o ipa/spotify.ipa
           case "$(file --mime-type -b ipa/spotify.ipa)" in application/zip|application/x-ios-app) ;; *) echo "::error::Not an IPA"; exit 1 ;; esac
 
       - name: Build the tweak into the IPA
         timeout-minutes: 30
         run: make release
 
+      # The IPA is already compressed: storing it as it is uploads in seconds instead of re-deflating 120 MB.
       - uses: actions/upload-artifact@v5
         if: inputs.upload_method != 'filebin'
         with:
           name: vitrine.ipa
           path: out/*.ipa
           if-no-files-found: error
+          compression-level: 1
 
       - name: Upload to filebin.net
         if: inputs.upload_method != 'artifacts'

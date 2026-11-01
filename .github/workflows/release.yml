@@ -27,26 +27,32 @@ jobs:
     runs-on: macos-latest
     env:
       THEOS: ${{ github.workspace }}/theos
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
     steps:
       - uses: actions/checkout@v5
 
-      # A checkout made from a Windows machine loses the executable bit; tweak/Makefile runs
-      # scripts/whats-new.sh and scripts/check-layers.sh.
-      - name: Make the scripts executable
-        run: chmod +x scripts/*.sh scripts/*.py
-
-      - uses: maxim-lobanov/setup-xcode@v1
+      - name: Cache the tools
+        uses: actions/cache@v4
         with:
-          xcode-version: latest-stable
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-tools-${{ hashFiles('.github/workflows/release.yml') }}
 
-      - uses: actions/checkout@v5
-        with:
-          repository: theos/theos
-          path: theos
-          submodules: recursive
-
+      # One step, as in build-ipa.yml: the echoes still name what it is on, and Xcode needs no setup here
+      # because macos-latest already has the current stable selected. The executable bit is restored here
+      # because a checkout made from a Windows machine loses it and tweak/Makefile calls scripts/ directly.
+      # Theos is a shallow clone: nothing in the build reads its history.
       - name: Install tools
-        run: brew install make dpkg ldid
+        timeout-minutes: 25
+        run: |
+          echo "==> xcode: $(xcodebuild -version | head -1)"
+          echo "==> scripts"
+          chmod +x scripts/*.sh scripts/*.py
+          echo "==> brew"
+          brew install make dpkg ldid
+          echo "==> theos"
+          git clone --depth 1 --recurse-submodules --shallow-submodules --jobs 8 https://github.com/theos/theos.git "$THEOS"
 
       # The flag table is read out of Spotify's binary (make flags), so it comes from a secret
       # instead of an IPA: gzip -9c tweak/Sources/Shared/Flags/SGFlagList.m | base64 | gh secret set SG_FLAG_LIST

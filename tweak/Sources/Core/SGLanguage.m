@@ -555,6 +555,9 @@ static NSDictionary<NSString *, NSString *> *table(void) {
             @"What the AI translator is told to do with a song's lines": @"Что ИИ-переводчику сказано делать со строками песни",
             @"Translate any song from the lyrics' corner menu": @"Переводить любую песню из меню текстов",
             @"Songs translated on this iPhone or by an AI translator come back translated": @"Песни, переведённые на этом iPhone или ИИ-переводчиком, открываются уже переведёнными",
+            @"Auto mix": @"Автомикс",
+            @"Blended transitions between songs, the way Spotify's Automix plays them. Read at launch, like every switch here": @"Плавные переходы между песнями, как их играет Automix у Spotify. Читается при запуске, как и остальные переключатели",
+            @"Auto mix in the context menu": @"Автомикс в контекстном меню",
         };
     });
     return table;

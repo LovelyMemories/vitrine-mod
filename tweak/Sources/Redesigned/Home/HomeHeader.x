@@ -28,7 +28,7 @@
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
 static const NSUInteger kTitleTries = 8;
 
-static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey, kFaceHostKey, kPinKey;
+static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey, kPinKey;
 // The title row's pill: a glass capsule around the filter button and the avatar, 44pt tall, as the reference has
 // it; the menu drives Spotify's own filter chips, hidden in the stack, and offers the device picker when Spotify
 // has one (a now playing bar) and the large shelf's Show all, its heading being gone (HomeTopPicks.x).
@@ -131,7 +131,6 @@ static UILabel *dateIn(UIView *header) {
 
 // The header's views, found once: the page lays out again as it appears, and the walk names classes.
 static __weak UIView *sg_header;
-static __weak UIView *sg_canvas;   // the page's own view: the header's row moving does not move it
 static __weak UIStackView *sg_stack;
 static __weak UIView *sg_scrim;
 static UIControl *connectButton(UIView *window);
@@ -216,12 +215,6 @@ static UIButton *pillButton(NSString *symbol, NSString *label) {
     return button;
 }
 
-// The pill is drawn on the page's view, not in the header's row: the row is what Spotify lays out and what a
-// pull and a scroll carry along, and anything inside it travels with it.
-static UIView *pillParent(UIView *header) {
-    return sg_canvas ?: header;
-}
-
 static SGRHomePillButtons *buttonsIn(UIView *header) {
     SGRHomePillButtons *buttons = objc_getAssociatedObject(header, &kButtonsKey);
     if (!buttons) {
@@ -234,8 +227,8 @@ static SGRHomePillButtons *buttonsIn(UIView *header) {
         [buttons addSubview:buttons.filter];
         objc_setAssociatedObject(header, &kButtonsKey, buttons, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    UIView *parent = pillParent(header);
-    if (buttons.superview != parent) [parent addSubview:buttons];
+    if (buttons.superview != header) [header addSubview:buttons];
+    else if (header.subviews.lastObject != buttons) [header bringSubviewToFront:buttons];
     return buttons;
 }
 
@@ -246,8 +239,8 @@ static UIView *glassIn(UIView *header) {
         glass.userInteractionEnabled = NO;
         objc_setAssociatedObject(header, &kGlassKey, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    UIView *parent = pillParent(header);
-    if (glass.superview != parent) [parent insertSubview:glass atIndex:0];
+    if (glass.superview != header) [header insertSubview:glass atIndex:0];
+    else if (header.subviews.firstObject != glass) [header sendSubviewToBack:glass];
     return glass;
 }
 
@@ -275,86 +268,46 @@ static void place(UIView *view, CGRect frame) {
 }
 
 
-#pragma mark - the pill's rim
+#pragma mark - the pill
 
-// The avatar is taken out of Spotify's row and into the pill: the row lays its arranged views out on every pass,
-// and anything left in it is carried down by a pull. It is the same view, so its tap and its menu stay its own.
-static void adoptFace(UIView *header, UIView *face) {
-    UIView *host = objc_getAssociatedObject(header, &kFaceHostKey);
-    if (!host) {
-        host = [UIView new];
-        host.backgroundColor = UIColor.clearColor;
-        [pillParent(header) addSubview:host];
-        objc_setAssociatedObject(header, &kFaceHostKey, host, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (face.superview == host) return;
-    if ([face.superview isKindOfClass:UIStackView.class]) [(UIStackView *)face.superview removeArrangedSubview:face];
-    [face removeFromSuperview];
-    face.transform = CGAffineTransformIdentity;
-    face.alpha = 1;
-    [host addSubview:face];
-    SGLog(@"redesign home: the avatar is in the pill, %@", NSStringFromCGRect(face.bounds));
-}
-
-// The pill's place, taken once from the row while it still stands where Spotify put it, and then kept: a pull
-// moves the row, and after this nothing of the pill is in it. Read off the avatar itself, in the row's own
-// coordinates, so the pill lands where the pill already is, then converted to the page's.
-static CGRect restingPill(UIView *header, UIStackView *stack, UIView *face) {
-    UIView *canvas = pillParent(header);
-    NSValue *known = objc_getAssociatedObject(canvas, &kPinKey);
+// The ring's place: read once from the row while it still stands where Spotify put it, and then kept in the
+// header's own coordinates. The header does not move with a scroll or a pull, so the ring stays where it was put,
+// the way the Search header's ring does (Redesigned/Search/SearchPage.x).
+static CGRect ringPlace(UIView *header, UIStackView *stack, UIView *face) {
+    NSValue *known = objc_getAssociatedObject(header, &kPinKey);
     if (known) return known.CGRectValue;
     if (header.bounds.size.width < 200 || header.bounds.size.height < 20) return CGRectZero;
     if (!CGAffineTransformIsIdentity(header.transform)) return CGRectZero;
     if (!face || face.superview != stack) return CGRectZero;
     CGRect faceFrame = facePlace(stack, face);
-    CGFloat faceWidth = faceFrame.size.width;
-    CGFloat midY = CGRectGetMidY(faceFrame);
+    CGFloat faceWidth = faceFrame.size.width, midY = CGRectGetMidY(faceFrame);
     if (faceWidth < 16 || faceWidth > 90 || midY < 6 || midY > header.bounds.size.height - 6) return CGRectZero;
     CGFloat width = kPillPad + kPillButton + faceWidth + kPillPad * 2;
-    CGFloat maxX = CGRectGetMaxX(faceFrame) + kPillPad;
-    CGRect inHeader = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
-    CGRect resting = canvas == header ? inHeader : [canvas convertRect:inHeader fromView:header];
-    objc_setAssociatedObject(canvas, &kPinKey, [NSValue valueWithCGRect:resting], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    SGLog(@"redesign home: the pill is pinned at %@ (header %@, avatar %@)", NSStringFromCGRect(resting),
-          NSStringFromCGRect(inHeader), NSStringFromCGRect(faceFrame));
-    return resting;
+    CGRect ring = CGRectMake(round(CGRectGetMaxX(faceFrame) + kPillPad - width),
+                             round(midY - kPillHeight / 2), width, kPillHeight);
+    objc_setAssociatedObject(header, &kPinKey, [NSValue valueWithCGRect:ring], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    SGLog(@"redesign home: the ring stays at %@", NSStringFromCGRect(ring));
+    return ring;
 }
 
+// Lays the pill out around the avatar, in the header's own coordinates: the pill and the avatar are part of the
+// row, and it is the row that a scroll and a pull carry.
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
-    UIView *canvas = pillParent(header);
     SGRHomePillButtons *buttons = buttonsIn(header);
     UIView *glass = glassIn(header);
-    CGRect pill = restingPill(header, stack, face);
-    BOOL pinned = !CGRectIsEmpty(pill);
-    if (!pinned) {
-        CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
-        CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
-        CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
-        CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
-        CGRect live = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
-        pill = canvas == header ? live : [canvas convertRect:live fromView:header];
-    }
+    CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
+    CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
+    CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
+    CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
+    CGRect pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
     place(glass, pill);
     place(buttons, pill);
     CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
     if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
     SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
-    UIView *host = nil;
-    if (face && pinned) {
-        adoptFace(header, face);
-        host = objc_getAssociatedObject(header, &kFaceHostKey);
-        place(host, pill);
-        CGSize size = face.bounds.size;
-        CGRect slot = CGRectMake(pill.size.width - kPillPad - size.width, (pill.size.height - size.height) / 2,
-                                 size.width, size.height);
-        if (!CGRectEqualToRect(face.frame, slot)) face.frame = slot;
-    }
-    if (glass.superview == canvas) [canvas bringSubviewToFront:glass];
-    if (buttons.superview == canvas) [canvas bringSubviewToFront:buttons];
-    if (host && host.superview == canvas) [canvas bringSubviewToFront:host];
-    // The ring is drawn on the view the pill really lives on, so it travels with it (or stays with it) either way.
-    SGRRingApply(pillParent(header), &kRimKey, pill, pill.size.height / 2);
-    return CGRectGetMinX(canvas == header ? pill : [header convertRect:pill fromView:canvas]);
+    CGRect ring = ringPlace(header, stack, face);
+    SGRRingApply(header, &kRimKey, CGRectIsEmpty(ring) ? pill : ring, pill.size.height / 2);
+    return CGRectGetMinX(pill);
 }
 
 static BOOL findHeader(UIView *view) {
@@ -408,12 +361,14 @@ static void followScroll(UIScrollView *scroll) {
     // The title stops rising at its own height: past that it has faded out, and nothing is written again until
     // the page comes back.
     CGAffineTransform up = CGAffineTransformMakeTranslation(0, -MIN(scrolled, faded));
-    // Only the title goes with the page: the pill, the avatar in it and the ring on it sit on the page's view,
-    // out of the row Spotify lays out and a pull carries.
+    // The title, the pill and Spotify's avatar rise and fade with the row; the ring, which hangs on the header,
+    // does not move at all.
+    BOOL glassFading = CACurrentMediaTime() < sg_glassFadeEnds || (alpha > 0.5) != sg_glassShown;
     UIView *glass = objc_getAssociatedObject(sg_header, &kGlassKey);
     rise(title, up, alpha);
-    riseGlass(glass, CGAffineTransformIdentity, 1);
-    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), CGAffineTransformIdentity, 1);
+    riseGlass(glass, glassFading ? CGAffineTransformMakeTranslation(0, -scrolled) : up, alpha);
+    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);
+    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, up, alpha);
 }
 
 @interface SGRHomeTitleFollower : NSObject
@@ -481,7 +436,6 @@ static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
     sg_pageView = view;
-    sg_canvas = view;
     UIView *header = sg_header;
     UIStackView *stack = sg_stack;
     vanish(sg_scrim);
@@ -492,7 +446,6 @@ static void layoutHeader(UIViewController *page) {
         if (SGRIsAvatar(part) && !face) face = part;
         else vanish(part);
     }
-    if (!face && sg_face && sg_face.window) face = sg_face;
     // A face that stopped being the avatar drops the scroll's transform and fade.
     if (sg_face && sg_face != face) rise(sg_face, CGAffineTransformIdentity, 1);
     sg_face = face;

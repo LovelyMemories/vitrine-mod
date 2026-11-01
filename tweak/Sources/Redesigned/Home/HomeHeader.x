@@ -27,7 +27,7 @@
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
 static const NSUInteger kTitleTries = 8;
 
-static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey;
+static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey, kFaceHostKey, kRestingKey;
 // The title row's pill: a glass capsule around the filter button and the avatar, 44pt tall, as the reference has
 // it; the menu drives Spotify's own filter chips, hidden in the stack, and offers the device picker when Spotify
 // has one (a now playing bar) and the large shelf's Show all, its heading being gone (HomeTopPicks.x).
@@ -291,31 +291,42 @@ static NSArray *rimRainbow(void) {
     return colors;
 }
 
+// One band of the ring: the rainbow under a stroke of `width`, turning at `turn` seconds a revolution,
+// `backwards` for the bands that turn against the others so the ring shimmers instead of merely spinning.
+static CAGradientLayer *rimBandIn(UIView *rim, CGFloat width, CGFloat alpha, CFTimeInterval turn, BOOL backwards) {
+    CAGradientLayer *band = [CAGradientLayer layer];
+    band.type = kCAGradientLayerConic;
+    band.colors = rimRainbow();
+    band.startPoint = CGPointMake(0.5, 0.5);
+    band.endPoint = CGPointMake(0.5, 0);
+    band.opacity = alpha;
+    CAShapeLayer *stroke = [CAShapeLayer layer];
+    stroke.fillColor = UIColor.clearColor.CGColor;
+    stroke.strokeColor = UIColor.blackColor.CGColor;
+    stroke.lineWidth = width;
+    band.mask = stroke;
+
+    CABasicAnimation *spin = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+    spin.fromValue = backwards ? @(2 * M_PI) : @0;
+    spin.toValue = backwards ? @0 : @(2 * M_PI);
+    spin.duration = turn;
+    spin.repeatCount = HUGE_VALF;
+    [band addAnimation:spin forKey:@"turn"];
+    [rim.layer addSublayer:band];
+    return band;
+}
+
 static UIView *rimIn(UIView *header, UIView *glass) {
     UIView *rim = objc_getAssociatedObject(glass, &kRimKey);
     if (rim) return rim;
     rim = [UIView new];
     rim.userInteractionEnabled = NO;
     rim.backgroundColor = UIColor.clearColor;
-    CAShapeLayer *mask = [CAShapeLayer layer];
-    mask.fillColor = UIColor.clearColor.CGColor;
-    mask.strokeColor = UIColor.blackColor.CGColor;
-    mask.lineWidth = kRimWidth;
-    rim.layer.mask = mask;
-
-    CAGradientLayer *gradient = [CAGradientLayer layer];
-    gradient.type = kCAGradientLayerConic;
-    gradient.colors = rimRainbow();
-    gradient.startPoint = CGPointMake(0.5, 0.5);
-    gradient.endPoint = CGPointMake(0.5, 0);
-    [rim.layer addSublayer:gradient];
-
-    CABasicAnimation *turn = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
-    turn.fromValue = @0;
-    turn.toValue = @(2 * M_PI);
-    turn.duration = kRimTurn;
-    turn.repeatCount = HUGE_VALF;
-    [gradient addAnimation:turn forKey:@"turn"];
+    // Three bands on the same capsule outline: the line itself, a wide faint one around it for the glow, and a
+    // wider fainter one for the light it throws, each turning at its own pace and two of them against the rest.
+    rimBandIn(rim, kRimWidth * 3, 0.45, kRimTurn * 1.6, YES);
+    rimBandIn(rim, kRimWidth * 6.5, 0.18, kRimTurn * 2.2, YES);
+    rimBandIn(rim, kRimWidth, 1, kRimTurn, NO);
 
     // Beside the glass in the header, not inside it: the glass is a UIVisualEffectView on iOS 26, and a
     // subview of one is drawn into its content, which the material rounds and can clip. The pill is pinned
@@ -325,59 +336,67 @@ static UIView *rimIn(UIView *header, UIView *glass) {
     return rim;
 }
 
-// The ring on the pill's bounds: the stroke sits on the capsule's edge, and the gradient is drawn far past
-// them, so the turn never shows a corner.
+// The ring on the pill's bounds: each band's stroke sits on the capsule's edge, and the gradient is drawn far
+// past them, so a turn never shows a corner.
 static void paintRim(UIView *header, UIView *glass, CGRect pill) {
     UIView *rim = rimIn(header, glass);
     // A header Spotify rebuilt has none of ours in it, and the ring is put back rather than lost with the old one;
     // then kept last, so the glass, the buttons and the avatar cannot draw over it.
     if (rim.superview != header) [header insertSubview:rim aboveSubview:glass];
     if (header.subviews.lastObject != rim) [header bringSubviewToFront:rim];
-    place(rim, CGRectInset(pill, -0.5, -0.5));
+    // On the pill's own rect: every band's stroke is centred on the capsule's edge, so the line straddles it and
+    // the wider bands throw their light to both sides, the rim's layer taking no clipping of its own.
+    place(rim, pill);
     CGRect bounds = rim.bounds;
     if (bounds.size.width < 2 || bounds.size.height < 2) return;
-    CAShapeLayer *mask = (CAShapeLayer *)rim.layer.mask;
-    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(bounds, kRimWidth / 2, kRimWidth / 2)
-                                                   cornerRadius:(bounds.size.height - kRimWidth) / 2];
-    if (!CGPathEqualToPath(mask.path, path.CGPath)) mask.path = path.CGPath;
-    CAGradientLayer *gradient = (CAGradientLayer *)rim.layer.sublayers.firstObject;
     CGFloat side = MAX(bounds.size.width, bounds.size.height) * 2;
     CGRect want = CGRectMake(0, 0, side, side);
-    if (!CGRectEqualToRect(gradient.bounds, want)) {
-        gradient.bounds = want;
-        gradient.position = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    for (CALayer *layer in rim.layer.sublayers) {
+        if (![layer isKindOfClass:CAGradientLayer.class]) continue;
+        CAGradientLayer *band = (CAGradientLayer *)layer;
+        CAShapeLayer *stroke = [band.mask isKindOfClass:CAShapeLayer.class] ? (CAShapeLayer *)band.mask : nil;
+        if (!stroke) continue;
+        CGFloat width = stroke.lineWidth;
+        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(bounds, width / 2, width / 2)
+                                                       cornerRadius:(bounds.size.height - width) / 2];
+        if (!CGPathEqualToPath(stroke.path, path.CGPath)) stroke.path = path.CGPath;
+        if (!CGRectEqualToRect(band.bounds, want)) {
+            band.bounds = want;
+            band.position = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+        }
     }
 }
 
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     SGRHomePillButtons *buttons = buttonsIn(header);
     UIView *glass = glassIn(header);
-    CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
-    CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
-    CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
-    CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
-    // The header's row is carried along as the page moves under it (the pull, the scroll), and the pill is not:
-    // it keeps the height it first had, and the avatar is held to that height with it, so the ring the pill wears
-    // stays where it was put rather than travelling with the avatar.
-    static BOOL haveMidY;
-    static CGFloat fixedMidY;
-    if (!haveMidY) {
-        fixedMidY = midY;
-        haveMidY = YES;
+    CGRect pill = restingPill(header, stack, face);
+    BOOL pinned = !CGRectIsEmpty(pill);
+    if (!pinned) {
+        // Still settling: laid out around the avatar as before, and pinned on a later pass.
+        CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
+        CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
+        CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
+        CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
+        pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
     }
-    midY = fixedMidY;
-    if (face) {
-        CGPoint slot = [header convertPoint:CGPointMake(CGRectGetMidX(faceFrame), midY) toView:stack];
-        if (fabs(face.center.y - slot.y) > 0.5) face.center = CGPointMake(face.center.x, slot.y);
-        faceFrame.origin.y = midY - faceFrame.size.height / 2;
-    }
-    CGRect pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
     place(glass, pill);
     place(buttons, pill);
     CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
     if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
     SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
     paintRim(header, glass, pill);
+    // Taken into the pill only once there is a place to keep: before that the avatar has to stay where Spotify
+    // put it, or the place could never be read off the row at all.
+    if (face && pinned) {
+        adoptFace(header, face);
+        UIView *host = objc_getAssociatedObject(header, &kFaceHostKey);
+        place(host, pill);
+        CGSize size = face.bounds.size;
+        CGRect slot = CGRectMake(pill.size.width - kPillPad - size.width, (pill.size.height - size.height) / 2,
+                                 size.width, size.height);
+        if (!CGRectEqualToRect(face.frame, slot)) face.frame = slot;
+    }
     return CGRectGetMinX(pill);
 }
 
@@ -407,16 +426,20 @@ static void rise(UIView *part, CGAffineTransform transform, CGFloat alpha) {
     if (part.alpha != alpha) part.alpha = alpha;
 }
 
-// The pill's glass takes no alpha (SGRGlass.h), so its material is switched, not faded: it stays on for as long
-// as the pill is on screen, which is now always.
+// The pill's glass takes no alpha (SGRGlass.h): it rises with the row, and its material goes off once the row is
+// half faded and comes back with it.
 static const NSTimeInterval kGlassFade = 0.15;
 static BOOL sg_glassShown = YES;
-static void riseGlass(UIView *glass, BOOL shown) {
+// When the material's last change ends: until then the glass keeps rising after the row has faded.
+static CFTimeInterval sg_glassFadeEnds;
+static void riseGlass(UIView *glass, CGAffineTransform transform, CGFloat alpha) {
     if (!glass) return;
-    if (!CGAffineTransformEqualToTransform(glass.transform, CGAffineTransformIdentity)) glass.transform = CGAffineTransformIdentity;
+    if (!CGAffineTransformEqualToTransform(glass.transform, transform)) glass.transform = transform;
+    BOOL shown = alpha > 0.5;
     UIView *shape = objc_getAssociatedObject(glass, &kPillGlassKey);
     if (!shape || shown == sg_glassShown) return;
     sg_glassShown = shown;
+    sg_glassFadeEnds = CACurrentMediaTime() + kGlassFade;
     [UIView animateWithDuration:kGlassFade animations:^{ SGRShowGlass(shape, shown); }];
 }
 
@@ -428,16 +451,12 @@ static void followScroll(UIScrollView *scroll) {
     // The title stops rising at its own height: past that it has faded out, and nothing is written again until
     // the page comes back.
     CGAffineTransform up = CGAffineTransformMakeTranslation(0, -MIN(scrolled, faded));
-    // The title and its date scroll away; the pill does not. It keeps its place over the feed, so the filter
-    // button and the avatar stay under the thumb however far the page has been scrolled, and the rim on it
-    // stays with them.
+    // Only the title goes with the page. The pill, the avatar in it and the ring on it are pinned in the header:
+    // they are no longer arranged views of Spotify's row, so its passes cannot carry them.
     rise(title, up, alpha);
-    riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), YES);
+    riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), CGAffineTransformIdentity, 1);
     rise(objc_getAssociatedObject(sg_header, &kButtonsKey), CGAffineTransformIdentity, 1);
-    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, CGAffineTransformIdentity, 1);
-    // A pull moves the row between the page's layout passes, and the pill does not go with it: it is laid out
-    // again on the scroll itself, so a downward swipe under the finger leaves the ring where it stands.
-    if (SGRHomeLook() && sg_stack && sg_face) layoutPill(sg_header, sg_stack, sg_face);
+    rise(objc_getAssociatedObject(sg_header, &kRimKey), CGAffineTransformIdentity, 1);
 }
 
 @interface SGRHomeTitleFollower : NSObject
@@ -515,6 +534,8 @@ static void layoutHeader(UIViewController *page) {
         if (SGRIsAvatar(part) && !face) face = part;
         else vanish(part);
     }
+    // The avatar is in the pill by now, out of the stack: the one already taken is the one to lay out.
+    if (!face && sg_face && sg_face.window) face = sg_face;
     // A face that stopped being the avatar drops the scroll's transform and fade.
     if (sg_face && sg_face != face) rise(sg_face, CGAffineTransformIdentity, 1);
     sg_face = face;

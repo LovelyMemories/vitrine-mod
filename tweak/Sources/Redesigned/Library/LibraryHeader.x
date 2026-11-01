@@ -44,7 +44,6 @@
 
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Redesigned/Kit/SGRRing.h"
 #import "Library.h"
 
 NSString *const SGRLibraryListIdentifier = @"YourLibraryContent.collectionView";
@@ -55,7 +54,7 @@ NSString *const SGRLibraryListIdentifier = @"YourLibraryContent.collectionView";
 static const CGFloat kRowInset = 8;
 static char kTitleKey, kRowWatchedKey;
 static char kRecentsKey, kSearchKey, kPlusKey, kHeaderTitleKey;
-static char kBackKey, kMenuKey, kFolderPlusKey, kPlayKey, kPauseKey, kFolderTitleKey, kRingKey;
+static char kBackKey, kMenuKey, kFolderPlusKey, kPlayKey, kPauseKey, kFolderTitleKey;
 
 static void vanish(UIView *view) {
     if (!view) return;
@@ -233,23 +232,6 @@ static void layoutRoot(UIView *page) {
     // The first pass that laid the header out, not the first pass at all: a page appearing lays out before
     // its controls have a size, and a line off that pass would say the header was left as Spotify's.
     UIView *face = isFace(trailing.lastObject) ? trailing.lastObject : nil;
-    // The avatar wears the ring Home's pill and Search's avatar wear (Kit/SGRRing.h). The header does not move with
-    // the list, so the ring needs no more than being put round the avatar on each pass.
-    if (face) {
-        // Left alone entirely when there is no avatar: a call with an empty rect would put the ring out, and this
-        // header is laid out rarely enough for one such call to be the last one it ever gets.
-        // On the row the avatar sits in, at the avatar's own frame, which is what the Search header does and what
-        // the ring is known to draw on: the header itself lays its subviews out and can put them back over ours.
-        UIView *row = face.superview ?: header;
-        CGRect avatar = CGRectInset(face.frame, -1, -1);
-        SGRRingApply(row, &kRingKey, avatar, MIN(avatar.size.width, avatar.size.height) / 2);
-        static BOOL ringLogged;
-        if (!ringLogged && header.window && avatar.size.width > 8) {
-            ringLogged = YES;
-            SGLog(@"redesign library: the ring is round the avatar at %@ (avatar %@, header %@)",
-                  NSStringFromCGRect(avatar), NSStringFromCGRect(face.frame), NSStringFromCGRect(header.bounds));
-        }
-    }
     static BOOL logged;
     if (!logged && header.window && face) {
         logged = YES;

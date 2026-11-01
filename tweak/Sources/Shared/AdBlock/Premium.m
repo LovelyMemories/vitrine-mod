@@ -9,6 +9,7 @@
 // A customize body is CustomizeMessage { 1 UcsResponse }; bootstrap wraps that in 2 { 1 { 1 { it } } }.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
+#import "Shared/Player/AutoMix.h"
 #import "Protobuf.h"
 
 #pragma mark - account attributes
@@ -409,10 +410,36 @@ static void keepLiveConfiguration(NSArray<SGPBField *> *fields) {
     [text writeToURL:[folder URLByAppendingPathComponent:@"live-config.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
 }
 
+// Forces one entry of the configuration by scope and name, whether the server sent it or not: what an SGRuleForce
+// of the table above does, for the entries whose switch is one of the mod's and is read at runtime.
+static void forceEntry(NSMutableArray<SGPBField *> *out, NSMutableSet<NSString *> *present,
+                       NSString *scope, NSString *name, BOOL on) {
+    NSString *key = [NSString stringWithFormat:@"%@.%@", scope, name];
+    if (![present containsObject:key]) {
+        NSData *identifier = SGPBSerialize(@[SGPBString(1, scope), SGPBString(2, name)]);
+        [out addObject:SGPBBytes(3, SGPBSerialize(@[SGPBBytes(1, identifier), SGPBBytes(3, boolValue(on))]))];
+        [present addObject:key];
+        return;
+    }
+    for (SGPBField *field in out) {
+        NSMutableArray<SGPBField *> *value = field.number == 3 && field.wire == 2 ? SGPBParse(field.payload) : nil;
+        NSArray<SGPBField *> *parts = value ? SGPBParse(SGPBFirst(value, 1).payload) : nil;
+        if (!parts) continue;
+        NSString *scopeOf = SGPBText(SGPBFirst(parts, 1)) ?: @"", *nameOf = SGPBText(SGPBFirst(parts, 2)) ?: @"";
+        if (![scopeOf isEqualToString:scope] || ![nameOf isEqualToString:name]) continue;
+        setValue(value, SGPBBytes(3, boolValue(on)));
+        field.payload = SGPBSerialize(value);
+        return;
+    }
+}
+
 static NSData *patchConfiguration(NSData *configuration) {
     NSMutableArray<SGPBField *> *fields = SGPBParse(configuration);
     if (!fields) return nil;
     keepLiveConfiguration(fields);
+    // The table below is the blocking's: it turns ads and capping off in the configuration. With only AutoMix on,
+    // none of it may run, or its switch would quietly bring the blocking with it.
+    BOOL blocking = SGHidden(SGKeyHideAds) || SGHidden(SGKeyFakePremium);
     NSMutableArray<SGPBField *> *out = [NSMutableArray array];
     NSMutableSet<NSString *> *present = [NSMutableSet set];
     for (SGPBField *field in fields) {
@@ -425,7 +452,7 @@ static NSData *patchConfiguration(NSData *configuration) {
         }
         NSString *scope = SGPBText(SGPBFirst(parts, 1)) ?: @"", *name = SGPBText(SGPBFirst(parts, 2)) ?: @"";
         BOOL removed = NO;
-        for (size_t i = 0; i < ruleCount && !removed; i++) {
+        for (size_t i = 0; i < ruleCount && blocking && !removed; i++) {
             if (!ruleMatches(&rules[i], scope, name)) continue;
             switch (rules[i].kind) {
                 case SGRuleRemove: removed = YES; break;
@@ -443,11 +470,17 @@ static NSData *patchConfiguration(NSData *configuration) {
         field.payload = SGPBSerialize(value);
         [out addObject:field];
     }
-    for (size_t i = 0; i < ruleCount; i++) {
+    for (size_t i = 0; i < ruleCount && blocking; i++) {
         if (rules[i].kind != SGRuleForce || !rules[i].scope || !rules[i].name) continue;
         if ([present containsObject:[NSString stringWithFormat:@"%s.%s", rules[i].scope, rules[i].name]]) continue;
         NSData *identifier = SGPBSerialize(@[SGPBString(1, @(rules[i].scope)), SGPBString(2, @(rules[i].name))]);
         [out addObject:SGPBBytes(3, SGPBSerialize(@[SGPBBytes(1, identifier), SGPBBytes(3, boolValue(rules[i].on))]))];
+    }
+    // AutoMix's own gate, written here rather than in the table above because its switch is one of the mod's: the
+    // player core reads automix from this configuration, so forcing the iOS-side flag alone changed nothing.
+    if (SGHidden(SGKeyAutoMix)) {
+        forceEntry(out, present, @"core-automix", @"automix_enabled", YES);
+        forceEntry(out, present, @"core-player", @"enable_auto_transitions_everywhere", YES);
     }
     return SGPBSerialize(out);
 }
@@ -464,9 +497,13 @@ static NSData *patchUcs(NSData *ucs) {
         });
         if (edited) resolve.payload = edited;
     }
-    SGPBField *attributes = SGPBFirst(fields, 3);
-    if (!attributes) [fields addObject:(attributes = SGPBBytes(3, nil))];
-    if (attributes.wire == 2) attributes.payload = patchAttributes(attributes.payload) ?: attributes.payload;
+    // The attributes are Spoof Premium's and Hide ads': with only AutoMix on, the response keeps Spotify's own, so
+    // the mod does not quietly turn a Free account into a spoofed Premium one.
+    if (SGHidden(SGKeyFakePremium) || SGHidden(SGKeyHideAds)) {
+        SGPBField *attributes = SGPBFirst(fields, 3);
+        if (!attributes) [fields addObject:(attributes = SGPBBytes(3, nil))];
+        if (attributes.wire == 2) attributes.payload = patchAttributes(attributes.payload) ?: attributes.payload;
+    }
     return SGPBSerialize(fields);
 }
 

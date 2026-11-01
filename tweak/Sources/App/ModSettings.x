@@ -351,11 +351,11 @@ static void SGApplyStarterDefaults(void) {
     if ([defaults boolForKey:kStarter]) return;
     for (NSString *key in @[SGKeyBlockTelemetry, SGKeyCleanLinks])
         SGSetEnabled(key, YES);
-    // Ads gone from the start, the three switches the tour's No ads card sets together, so a fresh install opens
-    // with that card already on. The redesign is left alone on purpose: its own default is on (Core/SGUIMode.m), so
-    // the tour opens with it picked too. Both are only a starting point; the tour and the settings can change them.
-    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium])
-        SGSetEnabled(key, YES);
+    // Off, not just unset: the build's own default of the redesign is on (Core/SGUIMode.m), and the ads have to be
+    // Spotify's here. So the tour opens with both cards off and the person picks; going on restarts Spotify either
+    // way, the switches being read at launch.
+    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium, SGKeyRedesign, SGKeyRedesignUntested])
+        SGSetEnabled(key, NO);
     SGSetInt(SGRKeyPlayerBackground, SGRPlayerBackgroundAnimated);
     SGSetInt(SGKeyLanguage, 1);
     SGSetEnabled(SGKeyMusicHaptics, YES);
@@ -375,7 +375,7 @@ static void SGApplyStarterDefaults(void) {
     ] forKey:@"spotifyglass.redesign.navbar.layout"];
     [defaults setBool:YES forKey:kStarter];
     SGPrefsChanged();
-    SGLog(@"defaults: the redesign, ads and upsells hidden, Premium spoofed; telemetry blocked, links cleaned, "
+    SGLog(@"defaults: Spotify's look, its ads and its account as they are; telemetry blocked, links cleaned, "
           @"Russian, Music Haptics, Apple Music's artwork, animated player");
 }
 

@@ -8,8 +8,16 @@ static NSString *const kAutoMixCore = @"core-automix.automix_enabled";
 static NSString *const kAutoMixSettings = @"ios-feature-settings.automix_enabled";
 
 static id forcedAutoMix(NSString *key) {
-    if (!SGEnabled(SGKeyAutoMix)) return nil;
-    return [key isEqualToString:kAutoMixCore] || [key isEqualToString:kAutoMixSettings] ? @YES : nil;
+    if (!SGHidden(SGKeyAutoMix)) return nil;
+    if (![key isEqualToString:kAutoMixCore] && ![key isEqualToString:kAutoMixSettings]) return nil;
+    // Said once: this line is the proof that the provider asks the mod for the flag at all, which is the first
+    // thing to look for when a forced flag seems to do nothing.
+    static BOOL logged;
+    if (!logged) {
+        logged = YES;
+        SGLog(@"automix: %@ answered on", key);
+    }
+    return @YES;
 }
 
 // A plain .m has no Logos %ctor: the registration runs as the dylib loads, before Spotify asks for a flag.

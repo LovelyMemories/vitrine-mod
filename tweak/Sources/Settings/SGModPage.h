@@ -25,8 +25,6 @@
 @property (nonatomic, strong) UIColor *tint;   // the square under the symbol, gray when nil (SGWithTile)
 // A face drawn round in the icon's place, for a row of a person rather than a setting (the Mod page's author).
 @property (nonatomic, strong) UIImage *avatar;
-// The face above the name, both centred in the row, as a profile block is: for that same row.
-@property (nonatomic) BOOL centred;
 // A switch row that changes the whole app draws SGGlowSwitch instead of a UISwitch.
 @property (nonatomic) BOOL glows;
 // The switch shows the opposite of what is stored under its key (SGShownRow).

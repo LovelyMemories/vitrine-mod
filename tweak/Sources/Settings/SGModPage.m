@@ -892,18 +892,10 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     if (SGAccessibilityTextSize() && row.value) content.secondaryText = stackedValue(row);
     if (row.color) content.secondaryTextProperties.color = row.color;
     BOOL tile = row.symbol && !row.color && self.tiles;
-    if (row.avatar) content.image = SGRoundImage(row.avatar, row.centred ? 56 : 29);
+    if (row.avatar) content.image = SGRoundImage(row.avatar, 29);
     else if (tile) content.image = row.tint ? SGTileImageTinted(row.symbol, row.tint) : SGTileImage(row.symbol);
     else if (!row.color) content.image = nil;
     BOOL icon = tile || row.avatar != nil;
-    if (row.centred) {
-        // A profile block rather than a list row: the face above the name, everything on the middle line.
-        content.axes = UILayoutConstraintAxisVertical;
-        content.imageToTextPadding = 10;
-        content.textProperties.alignment = NSTextAlignmentCenter;
-        content.secondaryTextProperties.alignment = NSTextAlignmentCenter;
-        content.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(18, 16, 18, 16);
-    }
     cell.contentConfiguration = content;
     cell.separatorInset = UIEdgeInsetsMake(0, icon ? SGTileRowInset : row.symbol && row.color ? 48 : 16, 0, 0);
 

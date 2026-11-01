@@ -365,6 +365,8 @@ static void followScroll(UIScrollView *scroll) {
     // does not move at all.
     BOOL glassFading = CACurrentMediaTime() < sg_glassFadeEnds || (alpha > 0.5) != sg_glassShown;
     UIView *glass = objc_getAssociatedObject(sg_header, &kGlassKey);
+    // The date above the title goes with it: same rise, same fade, so the block leaves the header as one.
+    rise(objc_getAssociatedObject(sg_header, &kDateKey), up, alpha);
     rise(title, up, alpha);
     riseGlass(glass, glassFading ? CGAffineTransformMakeTranslation(0, -scrolled) : up, alpha);
     rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);

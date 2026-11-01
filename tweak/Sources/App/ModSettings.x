@@ -32,6 +32,7 @@
 #import "Shared/Player/PlayerSettings.h"
 #import "Shared/Haptics/Haptics.h"
 #import "App/About/About.h"
+#import "App/About/Author.h"
 #import "App/Onboarding/Onboarding.h"
 #import "Redesigned/Album/Album.h"
 #import "Redesigned/Artist/Artist.h"
@@ -45,6 +46,15 @@ static char kRowKey, kInsetKey;
 // Each part of Spotify on a tile of its own color, as Settings lists its own, so a row is found by its color.
 static SGModRow *pageRow(NSString *title, NSString *symbol, UIColor *color, UIViewController *(^page)(void)) {
     return SGWithTile(SGPageRow(title, page), symbol, color);
+}
+
+// The author's row: their face, round, the name they use beside it and what they are to the mod under it, the way
+// a row with a subtitle sits. Not a setting and not a link, so it takes no tap.
+static SGModRow *SGAuthorRow(void) {
+    SGModRow *row = SGStatRow(@"drippypsycho", ^NSString *{ return @""; });
+    row.subtitle = @"dev";
+    row.avatar = SGAuthorAvatar();
+    return row;
 }
 
 static UIViewController *modSettingsPage(void) {
@@ -131,6 +141,8 @@ static UIViewController *modSettingsPage(void) {
             SGWithTile(SGActionRow(@"Import settings", @"Load a file Export settings made; Spotify restarts", ^{ SGImportSettings(); }),
                        @"square.and.arrow.down", UIColor.systemGreenColor),
         ]),
+        // The mod's author, under the Backup block: a face and the name it goes by, the way the tour signs off.
+        SGSection(nil, @[SGAuthorRow()]),
     ]];
     // The Mod row (the build's version, updates, links, backup and licenses) is hidden: the page stays
     // defined, SGAboutPage(), so nothing else that reached for it changes.
@@ -339,10 +351,11 @@ static void SGApplyStarterDefaults(void) {
     if ([defaults boolForKey:kStarter]) return;
     for (NSString *key in @[SGKeyBlockTelemetry, SGKeyCleanLinks])
         SGSetEnabled(key, YES);
-    // Off, not just unset: the build's own default of the redesign is on (Core/SGUIMode.m), and the ads have to be
-    // Spotify's here.
-    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium, SGKeyRedesign, SGKeyRedesignUntested])
-        SGSetEnabled(key, NO);
+    // Ads gone from the start, the three switches the tour's No ads card sets together, so a fresh install opens
+    // with that card already on. The redesign is left alone on purpose: its own default is on (Core/SGUIMode.m), so
+    // the tour opens with it picked too. Both are only a starting point; the tour and the settings can change them.
+    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium])
+        SGSetEnabled(key, YES);
     SGSetInt(SGRKeyPlayerBackground, SGRPlayerBackgroundAnimated);
     SGSetInt(SGKeyLanguage, 1);
     SGSetEnabled(SGKeyMusicHaptics, YES);
@@ -362,8 +375,8 @@ static void SGApplyStarterDefaults(void) {
     ] forKey:@"spotifyglass.redesign.navbar.layout"];
     [defaults setBool:YES forKey:kStarter];
     SGPrefsChanged();
-    SGLog(@"defaults: Spotify's look, its ads and its account as they are; telemetry blocked, links cleaned, Russian, "
-          @"Music Haptics, Apple Music's artwork, animated player");
+    SGLog(@"defaults: the redesign, ads and upsells hidden, Premium spoofed; telemetry blocked, links cleaned, "
+          @"Russian, Music Haptics, Apple Music's artwork, animated player");
 }
 
 %ctor {

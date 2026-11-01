@@ -2,8 +2,9 @@
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 
-static const CGFloat kRingWidth = 1.5;          // the line itself
+static const CGFloat kRingWidth = 1.7;          // the line itself
 static const CFTimeInterval kRingTurn = 8;      // seconds for the line to go round once
+static const CGFloat kRingLighten = 0.16;       // how far each colour is pulled towards white
 
 // Around a capsule the way a conic gradient runs, starting and ending on the same pink so a turn has no seam.
 static NSArray *ringRainbow(void) {
@@ -13,8 +14,13 @@ static NSArray *ringRainbow(void) {
         NSMutableArray *list = [NSMutableArray array];
         for (NSNumber *rgb in @[@0xFF375F, @0xFF9F0A, @0xFFD60A, @0x30D158, @0x64D2FF, @0x0A84FF, @0xBF5AF2, @0xFF375F]) {
             uint32_t v = rgb.unsignedIntValue;
-            [list addObject:(id)[UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0 green:((v >> 8) & 0xFF) / 255.0
-                                                 blue:(v & 0xFF) / 255.0 alpha:1].CGColor];
+            // Pulled a little towards white: on the dark pill the plain hues read muddy, and the line wants to
+            // look lit rather than painted.
+            CGFloat r = ((v >> 16) & 0xFF) / 255.0, g = ((v >> 8) & 0xFF) / 255.0, b = (v & 0xFF) / 255.0;
+            r += (1 - r) * kRingLighten;
+            g += (1 - g) * kRingLighten;
+            b += (1 - b) * kRingLighten;
+            [list addObject:(id)[UIColor colorWithRed:r green:g blue:b alpha:1].CGColor];
         }
         colors = list;
     });
@@ -56,7 +62,7 @@ void SGRRingApply(UIView *host, const void *key, CGRect rect, CGFloat radius) {
         rim = [UIView new];
         rim.userInteractionEnabled = NO;
         rim.backgroundColor = UIColor.clearColor;
-        bandIn(rim, kRingWidth * 2.3, 0.32, kRingTurn * 1.6, YES);
+        bandIn(rim, kRingWidth * 3, 0.46, kRingTurn * 1.6, YES);
         bandIn(rim, kRingWidth, 1, kRingTurn, NO);
         objc_setAssociatedObject(host, key, rim, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }

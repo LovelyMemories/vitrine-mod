@@ -47,7 +47,9 @@ spotifyglass.all.tweak.variables: sg-audio
 sg-audio:
 	@$(MAKE) --no-print-directory -C $(SG_AUDIO) PLATFORM=ios
 
-# The layers of Sources/ stay apart (scripts/check-layers.sh): an import across them fails the build.
+# The layers of Sources/ stay apart (scripts/check-layers.sh): an import across them fails the build, and so
+# does a static function nothing calls (scripts/check-dead-code.sh), which -Werror would fail a minute in.
 # A copy of tweak/ made without the scripts beside it builds unchecked.
 before-all::
 	@if [ -x ../scripts/check-layers.sh ]; then ../scripts/check-layers.sh Sources; fi
+	@if [ -x ../scripts/check-dead-code.sh ]; then ../scripts/check-dead-code.sh Sources; fi

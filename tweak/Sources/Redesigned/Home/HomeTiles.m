@@ -222,19 +222,6 @@ static void tint(UIView *tile, UIView *surface, UIColor *color, BOOL animated) {
     SGRAnimate(SGRMotionFade, ^{ surface.backgroundColor = color; }, nil);
 }
 
-// The tile at the top left of the grid: its cover is the color the page washes with, as Spotify's own Home takes
-// the wash from the first thing on it. Judged by the tiles already in the grid, so it is settled as they land.
-static BOOL leadingTile(UIView *tile) {
-    UIView *grid = tile.superview;
-    if (!grid) return YES;
-    for (UIView *sibling in grid.subviews) {
-        if (sibling == tile || !objc_getAssociatedObject(sibling, &kSurfaceKey)) continue;
-        if (sibling.frame.origin.y < tile.frame.origin.y - 1.5) return NO;
-        if (fabs(sibling.frame.origin.y - tile.frame.origin.y) <= 1.5 && sibling.frame.origin.x < tile.frame.origin.x - 1.5) return NO;
-    }
-    return YES;
-}
-
 static void refresh(UIView *tile) {
     SGRTileParts *parts = partsOf(tile);
     UIImageView *cover = parts.cover;

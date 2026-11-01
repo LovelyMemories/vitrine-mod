@@ -607,16 +607,6 @@ static void setColor(SGRLargeCardParts *parts, UIColor *color, BOOL animated) {
     SGRAnimate(SGRMotionFade, ^{ parts.surface.backgroundColor = color; }, nil);
 }
 
-// The first card of the large shelf: the page takes its color.
-static BOOL isFirstCard(UIView *card) {
-    UIView *cell = card;
-    while (cell && ![cell isKindOfClass:UICollectionViewCell.class]) cell = cell.superview;
-    UICollectionView *shelf = sg_largeShelf;
-    if (!cell || !shelf || ![cell isDescendantOfView:shelf]) return NO;
-    NSIndexPath *path = [shelf indexPathForCell:(UICollectionViewCell *)cell];
-    return path && path.item == 0;
-}
-
 static void tintCard(UIView *card, UIImageView *cover) {
     SGRLargeCardParts *parts = objc_getAssociatedObject(card, &kPartsKey);
     UIImage *image = cover.image;

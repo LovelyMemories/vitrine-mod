@@ -9,6 +9,10 @@ public final class SGLiveActivityBridge: NSObject {
     private static let log = Logger(subsystem: "spotifyglass", category: "live activity")
     // What ActivityKit takes of one state, with room left for its own envelope.
     private static let kStateBudget = 3800
+    // How long a card is worth reading without the app sending a new state. Spotify plays in the background, so
+    // a pause is not this: it is the app being gone, which nothing here can tell ActivityKit about (a swipe in
+    // the app switcher gives the app no chance to end it). Past this the system marks the card stale.
+    private static let kStaleAfter: TimeInterval = 5 * 60
 
     private static var current: Activity<SGLyricsAttributes>? {
         Activity<SGLyricsAttributes>.activities.first { $0.activityState == .active || $0.activityState == .stale }
@@ -85,7 +89,7 @@ public final class SGLiveActivityBridge: NSObject {
         if let encoded = try? JSONEncoder().encode(state), encoded.count > kStateBudget {
             state.cover = nil
         }
-        let content = ActivityContent(state: state, staleDate: nil)
+        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(kStaleAfter))
         if let activity = current {
             queue(.update(activity.id, content))
             return

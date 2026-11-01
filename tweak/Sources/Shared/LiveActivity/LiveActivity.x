@@ -379,10 +379,24 @@ void SGSetLiveActivityEnabled(BOOL on) {
         SGMigrateKey(SGKeyLiveActivityWas, SGKeyLiveActivity);
         SGMigrateKey(SGKeyLiveActivityViewWas, SGKeyLiveActivityView);
         BOOL on = SGFlag(SGKeyLiveActivity, NO);
-        // Off, one left from a launch before the switch went off is ended.
+        // A card left by an earlier launch is closed before this one draws its own: a swipe in the app switcher
+        // gives the app no chance to end it, and iOS keeps a Live Activity on the lock screen until the app
+        // ends it or eight hours pass. The new one starts a moment later, so the two never overlap.
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (on) SGSetLiveActivityEnabled(YES);
-            else [SGLiveActivityBridge end];
+            [SGLiveActivityBridge end];
+            if (!on) {
+                SGLog(@"live activity: off");
+                return;
+            }
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                SGSetLiveActivityEnabled(YES);
+            });
         });
+        // A clean end of the app takes the card with it; the force quit in the app switcher cannot, and that
+        // one the system clears on its own, at the latest after eight hours.
+        [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationWillTerminateNotification object:nil queue:nil
+                                                    usingBlock:^(NSNotification *note) {
+            [SGLiveActivityBridge end];
+        }];
     }
 }

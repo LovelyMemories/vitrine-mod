@@ -130,6 +130,7 @@ static UILabel *dateIn(UIView *header) {
 
 // The header's views, found once: the page lays out again as it appears, and the walk names classes.
 static __weak UIView *sg_header;
+static __weak UIView *sg_canvas;   // the page's view, which the header's row moving does not move
 static __weak UIStackView *sg_stack;
 static __weak UIView *sg_scrim;
 static UIControl *connectButton(UIView *window);
@@ -214,6 +215,12 @@ static UIButton *pillButton(NSString *symbol, NSString *label) {
     return button;
 }
 
+// The pill lives on the page's view, not in the header's row: the row is what Spotify lays out and what a pull
+// carries down, and anything inside it travels with it. The page's view holds the header and does not move.
+static UIView *pillParent(UIView *header) {
+    return sg_canvas ?: header;
+}
+
 static SGRHomePillButtons *buttonsIn(UIView *header) {
     SGRHomePillButtons *buttons = objc_getAssociatedObject(header, &kButtonsKey);
     if (!buttons) {
@@ -226,8 +233,8 @@ static SGRHomePillButtons *buttonsIn(UIView *header) {
         [buttons addSubview:buttons.filter];
         objc_setAssociatedObject(header, &kButtonsKey, buttons, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (buttons.superview != header) [header addSubview:buttons];
-    else if (header.subviews.lastObject != buttons) [header bringSubviewToFront:buttons];
+    UIView *parent = pillParent(header);
+    if (buttons.superview != parent) [parent addSubview:buttons];
     return buttons;
 }
 
@@ -238,8 +245,8 @@ static UIView *glassIn(UIView *header) {
         glass.userInteractionEnabled = NO;
         objc_setAssociatedObject(header, &kGlassKey, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (glass.superview != header) [header insertSubview:glass atIndex:0];
-    else if (header.subviews.firstObject != glass) [header sendSubviewToBack:glass];
+    UIView *parent = pillParent(header);
+    if (glass.superview != parent) [parent insertSubview:glass atIndex:0];
     return glass;
 }
 
@@ -291,20 +298,24 @@ static NSArray *rimRainbow(void) {
     return colors;
 }
 
-// One band of the ring: the rainbow under a stroke of `width`, turning at `turn` seconds a revolution,
-// `backwards` for the bands that turn against the others so the ring shimmers instead of merely spinning.
-static CAGradientLayer *rimBandIn(UIView *rim, CGFloat width, CGFloat alpha, CFTimeInterval turn, BOOL backwards) {
+// One band of the ring: a holder masked to a stroke of `width` on the capsule, and inside it the rainbow,
+// turning. The mask is on the holder and not on the gradient, or the turn would carry the mask round with it
+// and the ring would sweep across the header as an arc.
+static CALayer *rimBandIn(UIView *rim, CGFloat width, CGFloat alpha, CFTimeInterval turn, BOOL backwards) {
+    CALayer *holder = [CALayer layer];
+    CAShapeLayer *stroke = [CAShapeLayer layer];
+    stroke.fillColor = UIColor.clearColor.CGColor;
+    stroke.strokeColor = UIColor.blackColor.CGColor;
+    stroke.lineWidth = width;
+    holder.mask = stroke;
+
     CAGradientLayer *band = [CAGradientLayer layer];
     band.type = kCAGradientLayerConic;
     band.colors = rimRainbow();
     band.startPoint = CGPointMake(0.5, 0.5);
     band.endPoint = CGPointMake(0.5, 0);
     band.opacity = alpha;
-    CAShapeLayer *stroke = [CAShapeLayer layer];
-    stroke.fillColor = UIColor.clearColor.CGColor;
-    stroke.strokeColor = UIColor.blackColor.CGColor;
-    stroke.lineWidth = width;
-    band.mask = stroke;
+    [holder addSublayer:band];
 
     CABasicAnimation *spin = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
     spin.fromValue = backwards ? @(2 * M_PI) : @0;
@@ -312,8 +323,9 @@ static CAGradientLayer *rimBandIn(UIView *rim, CGFloat width, CGFloat alpha, CFT
     spin.duration = turn;
     spin.repeatCount = HUGE_VALF;
     [band addAnimation:spin forKey:@"turn"];
-    [rim.layer addSublayer:band];
-    return band;
+
+    [rim.layer addSublayer:holder];
+    return holder;
 }
 
 static UIView *rimIn(UIView *header, UIView *glass) {
@@ -322,16 +334,16 @@ static UIView *rimIn(UIView *header, UIView *glass) {
     rim = [UIView new];
     rim.userInteractionEnabled = NO;
     rim.backgroundColor = UIColor.clearColor;
-    // Three bands on the same capsule outline: the line itself, a wide faint one around it for the glow, and a
-    // wider fainter one for the light it throws, each turning at its own pace and two of them against the rest.
-    rimBandIn(rim, kRimWidth * 3, 0.45, kRimTurn * 1.6, YES);
-    rimBandIn(rim, kRimWidth * 6.5, 0.18, kRimTurn * 2.2, YES);
+    // Two bands on the same capsule outline: the line itself, and a narrow faint one under it for the glow,
+    // turning the other way so the light moves against the line rather than with it.
+    rimBandIn(rim, kRimWidth * 2.3, 0.32, kRimTurn * 1.6, YES);
     rimBandIn(rim, kRimWidth, 1, kRimTurn, NO);
 
     // Beside the glass in the header, not inside it: the glass is a UIVisualEffectView on iOS 26, and a
     // subview of one is drawn into its content, which the material rounds and can clip. The pill is pinned
     // (followScroll), so a sibling stays on it without a transform of its own.
-    [header insertSubview:rim aboveSubview:glass];
+    UIView *parent = pillParent(header);
+    if (rim.superview != parent) [parent addSubview:rim];
     objc_setAssociatedObject(glass, &kRimKey, rim, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return rim;
 }
@@ -342,39 +354,44 @@ static void paintRim(UIView *header, UIView *glass, CGRect pill) {
     UIView *rim = rimIn(header, glass);
     // A header Spotify rebuilt has none of ours in it, and the ring is put back rather than lost with the old one;
     // then kept last, so the glass, the buttons and the avatar cannot draw over it.
-    if (rim.superview != header) [header insertSubview:rim aboveSubview:glass];
-    if (header.subviews.lastObject != rim) [header bringSubviewToFront:rim];
+    UIView *parent = pillParent(header);
+    if (rim.superview != parent) [parent addSubview:rim];
+    if (parent.subviews.lastObject != rim) [parent bringSubviewToFront:rim];
     // On the pill's own rect: every band's stroke is centred on the capsule's edge, so the line straddles it and
     // the wider bands throw their light to both sides, the rim's layer taking no clipping of its own.
     place(rim, pill);
     CGRect bounds = rim.bounds;
     if (bounds.size.width < 2 || bounds.size.height < 2) return;
     CGFloat side = MAX(bounds.size.width, bounds.size.height) * 2;
-    CGRect want = CGRectMake(0, 0, side, side);
-    for (CALayer *layer in rim.layer.sublayers) {
-        if (![layer isKindOfClass:CAGradientLayer.class]) continue;
-        CAGradientLayer *band = (CAGradientLayer *)layer;
-        CAShapeLayer *stroke = [band.mask isKindOfClass:CAShapeLayer.class] ? (CAShapeLayer *)band.mask : nil;
+    CGRect canvas = CGRectMake(0, 0, side, side);
+    CGPoint middle = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    for (CALayer *holder in rim.layer.sublayers) {
+        CAShapeLayer *stroke = [holder.mask isKindOfClass:CAShapeLayer.class] ? (CAShapeLayer *)holder.mask : nil;
         if (!stroke) continue;
         CGFloat width = stroke.lineWidth;
         UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(bounds, width / 2, width / 2)
                                                        cornerRadius:(bounds.size.height - width) / 2];
         if (!CGPathEqualToPath(stroke.path, path.CGPath)) stroke.path = path.CGPath;
-        if (!CGRectEqualToRect(band.bounds, want)) {
-            band.bounds = want;
-            band.position = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+        if (!CGRectEqualToRect(holder.bounds, bounds)) {
+            holder.bounds = bounds;
+            holder.position = middle;
+        }
+        for (CALayer *sub in holder.sublayers) {
+            if (![sub isKindOfClass:CAGradientLayer.class]) continue;
+            if (!CGRectEqualToRect(sub.bounds, canvas)) {
+                sub.bounds = canvas;
+                sub.position = middle;
+            }
         }
     }
 }
 
-// The avatar is taken out of Spotify's row and into the pill, so the pill can hold still while the row it came
-// from scrolls: the row lays its arranged views out on every pass, and anything still in it travels with them.
 static void adoptFace(UIView *header, UIView *face) {
     UIView *host = objc_getAssociatedObject(header, &kFaceHostKey);
     if (!host) {
         host = [UIView new];
         host.backgroundColor = UIColor.clearColor;
-        [header addSubview:host];
+        [pillParent(header) addSubview:host];
         objc_setAssociatedObject(header, &kFaceHostKey, host, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (face.superview == host) return;
@@ -386,27 +403,34 @@ static void adoptFace(UIView *header, UIView *face) {
     SGLog(@"redesign home: the avatar is in the pill, %@", NSStringFromCGRect(face.bounds));
 }
 
-// The pill's place at rest, taken once from the row while it is still where Spotify put it. The row is carried
-// along as the page moves under it; the pill is not, and neither is the ring on it. A pass before the row has
-// settled has no sane height to offer, so the place is only taken from one that does.
+// The pill's place at rest, taken once and kept: the header's row is carried down by a pull and up by a scroll,
+// the title is not, and neither is the pill. It is read from the header's own bounds and the row's height rather
+// than from where the avatar happens to be, so a pass has something to give as soon as the header has its size.
 static CGRect restingPill(UIView *header, UIStackView *stack, UIView *face) {
-    // Kept with the header it was read from: a header Spotify makes again has its own place.
-    NSValue *known = objc_getAssociatedObject(header, &kRestingKey);
+    // Kept with the view it was read into: a header Spotify makes again has its own place.
+    NSValue *known = objc_getAssociatedObject(pillParent(header), &kRestingKey);
     if (known) return known.CGRectValue;
-    if (!face || face.superview != stack) return CGRectZero;
-    CGRect faceFrame = facePlace(stack, face);
-    CGFloat midY = CGRectGetMidY(faceFrame);
-    // A pass before the header has its size puts the row at the origin: that height is not one to keep.
-    if (faceFrame.size.width < 16 || midY < 6 || midY > header.bounds.size.height - 6) return CGRectZero;
-    CGFloat width = kPillPad + kPillButton + faceFrame.size.width + kPillPad * 2;
-    CGRect resting = CGRectMake(round(header.bounds.size.width - SGRSideMargin - width),
-                                round(midY - kPillHeight / 2), width, kPillHeight);
-    objc_setAssociatedObject(header, &kRestingKey, [NSValue valueWithCGRect:resting], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (header.bounds.size.width < 200 || header.bounds.size.height < 20) return CGRectZero;
+    // A row mid-animation carries a transform, and a rect converted through it lands somewhere else.
+    if (!CGAffineTransformIsIdentity(header.transform)) return CGRectZero;
+    CGFloat middle = CGRectGetMidY(untransformed(stack));
+    if (middle < 6 || middle > header.bounds.size.height - 6) return CGRectZero;
+    // The avatar's own width when it has one, the pill's usual inset when it does not: a pass before Spotify has
+    // sized the face still gets a pill of the right shape rather than a zero-wide one.
+    CGFloat faceWidth = face.bounds.size.width;
+    if (faceWidth < 16 || faceWidth > 90) faceWidth = kPillHeight - 12;
+    CGFloat width = kPillPad + kPillButton + faceWidth + kPillPad * 2;
+    UIView *canvas = pillParent(header);
+    CGRect inHeader = CGRectMake(round(header.bounds.size.width - SGRSideMargin - width),
+                                 round(middle - kPillHeight / 2), width, kPillHeight);
+    CGRect resting = canvas == header ? inHeader : [canvas convertRect:inHeader fromView:header];
+    objc_setAssociatedObject(canvas, &kRestingKey, [NSValue valueWithCGRect:resting], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     SGLog(@"redesign home: the pill is pinned at %@", NSStringFromCGRect(resting));
     return resting;
 }
 
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
+    UIView *canvas = pillParent(header);
     SGRHomePillButtons *buttons = buttonsIn(header);
     UIView *glass = glassIn(header);
     CGRect pill = restingPill(header, stack, face);
@@ -417,26 +441,32 @@ static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
         CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
         CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
         CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
-        pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
+        CGRect live = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
+        pill = canvas == header ? live : [canvas convertRect:live fromView:header];
     }
     place(glass, pill);
     place(buttons, pill);
     CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
     if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
     SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
-    paintRim(header, glass, pill);
     // Taken into the pill only once there is a place to keep: before that the avatar has to stay where Spotify
     // put it, or the place could never be read off the row at all.
+    UIView *host = nil;
     if (face && pinned) {
         adoptFace(header, face);
-        UIView *host = objc_getAssociatedObject(header, &kFaceHostKey);
+        host = objc_getAssociatedObject(header, &kFaceHostKey);
         place(host, pill);
         CGSize size = face.bounds.size;
         CGRect slot = CGRectMake(pill.size.width - kPillPad - size.width, (pill.size.height - size.height) / 2,
                                  size.width, size.height);
         if (!CGRectEqualToRect(face.frame, slot)) face.frame = slot;
     }
-    return CGRectGetMinX(pill);
+    // Above the page's feed and the header's row, in this order: glass, the buttons, the avatar, the ring.
+    if (glass.superview == canvas) [canvas bringSubviewToFront:glass];
+    if (buttons.superview == canvas) [canvas bringSubviewToFront:buttons];
+    if (host && host.superview == canvas) [canvas bringSubviewToFront:host];
+    paintRim(header, glass, pill);
+    return CGRectGetMinX(canvas == header ? pill : [header convertRect:pill fromView:canvas]);
 }
 
 static BOOL findHeader(UIView *view) {
@@ -563,6 +593,7 @@ static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
     sg_pageView = view;
+    sg_canvas = view;
     UIView *header = sg_header;
     UIStackView *stack = sg_stack;
     vanish(sg_scrim);

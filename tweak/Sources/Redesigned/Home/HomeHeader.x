@@ -367,6 +367,45 @@ static void paintRim(UIView *header, UIView *glass, CGRect pill) {
     }
 }
 
+// The avatar is taken out of Spotify's row and into the pill, so the pill can hold still while the row it came
+// from scrolls: the row lays its arranged views out on every pass, and anything still in it travels with them.
+static void adoptFace(UIView *header, UIView *face) {
+    UIView *host = objc_getAssociatedObject(header, &kFaceHostKey);
+    if (!host) {
+        host = [UIView new];
+        host.backgroundColor = UIColor.clearColor;
+        [header addSubview:host];
+        objc_setAssociatedObject(header, &kFaceHostKey, host, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (face.superview == host) return;
+    if ([face.superview isKindOfClass:UIStackView.class]) [(UIStackView *)face.superview removeArrangedSubview:face];
+    [face removeFromSuperview];
+    face.transform = CGAffineTransformIdentity;
+    face.alpha = 1;
+    [host addSubview:face];
+    SGLog(@"redesign home: the avatar is in the pill, %@", NSStringFromCGRect(face.bounds));
+}
+
+// The pill's place at rest, taken once from the row while it is still where Spotify put it. The row is carried
+// along as the page moves under it; the pill is not, and neither is the ring on it. A pass before the row has
+// settled has no sane height to offer, so the place is only taken from one that does.
+static CGRect restingPill(UIView *header, UIStackView *stack, UIView *face) {
+    // Kept with the header it was read from: a header Spotify makes again has its own place.
+    NSValue *known = objc_getAssociatedObject(header, &kRestingKey);
+    if (known) return known.CGRectValue;
+    if (!face || face.superview != stack) return CGRectZero;
+    CGRect faceFrame = facePlace(stack, face);
+    CGFloat midY = CGRectGetMidY(faceFrame);
+    // A pass before the header has its size puts the row at the origin: that height is not one to keep.
+    if (faceFrame.size.width < 16 || midY < 6 || midY > header.bounds.size.height - 6) return CGRectZero;
+    CGFloat width = kPillPad + kPillButton + faceFrame.size.width + kPillPad * 2;
+    CGRect resting = CGRectMake(round(header.bounds.size.width - SGRSideMargin - width),
+                                round(midY - kPillHeight / 2), width, kPillHeight);
+    objc_setAssociatedObject(header, &kRestingKey, [NSValue valueWithCGRect:resting], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    SGLog(@"redesign home: the pill is pinned at %@", NSStringFromCGRect(resting));
+    return resting;
+}
+
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     SGRHomePillButtons *buttons = buttonsIn(header);
     UIView *glass = glassIn(header);

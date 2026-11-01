@@ -236,11 +236,19 @@ static void layoutRoot(UIView *page) {
     // The avatar wears the ring Home's pill and Search's avatar wear (Kit/SGRRing.h). The header does not move with
     // the list, so the ring needs no more than being put round the avatar on each pass.
     if (face) {
-        CGRect avatar = [face convertRect:face.bounds toView:header];
-        avatar = CGRectInset(avatar, -1, -1);
-        SGRRingApply(header, &kRingKey, avatar, MIN(avatar.size.width, avatar.size.height) / 2);
-    } else {
-        SGRRingApply(header, &kRingKey, CGRectZero, 0);
+        // Left alone entirely when there is no avatar: a call with an empty rect would put the ring out, and this
+        // header is laid out rarely enough for one such call to be the last one it ever gets.
+        // On the row the avatar sits in, at the avatar's own frame, which is what the Search header does and what
+        // the ring is known to draw on: the header itself lays its subviews out and can put them back over ours.
+        UIView *row = face.superview ?: header;
+        CGRect avatar = CGRectInset(face.frame, -1, -1);
+        SGRRingApply(row, &kRingKey, avatar, MIN(avatar.size.width, avatar.size.height) / 2);
+        static BOOL ringLogged;
+        if (!ringLogged && header.window && avatar.size.width > 8) {
+            ringLogged = YES;
+            SGLog(@"redesign library: the ring is round the avatar at %@ (avatar %@, header %@)",
+                  NSStringFromCGRect(avatar), NSStringFromCGRect(face.frame), NSStringFromCGRect(header.bounds));
+        }
     }
     static BOOL logged;
     if (!logged && header.window && face) {

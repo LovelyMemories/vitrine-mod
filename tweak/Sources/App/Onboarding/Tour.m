@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGPageStyle.h"
 #import "Onboarding.h"
+#import "TourMark.h"
 #import "App/About/About.h"
 #import "App/Pages.h"
 #import "Shared/AdBlock/AdBlock.h"
@@ -159,152 +160,57 @@ static UIView *tipsCard(NSArray<UIView *> *rows) {
 
 #pragma mark - the logo
 
-// Vitrine's icon in live glass: reeds of glass over a warm glow, the shop window of the app icon this build
-// shipped with (icons/README.md).
-// The tour opens on it, each reed flying in and landing beside the last, before the page comes in
-// under it. Glass shows and hides by its effect, never by an alpha (Redesigned/Kit/SGRGlass.h).
+// Spotify's own round mark as the tour's logo: the tour opens on it, it settles in, and the page comes in under
+// it. The picture lives in the code (TourMark.h), so the tweak still takes no bundle of its own.
 @interface SGTourLogo : UIView
-// The state before the landing: the frame alone, no glass, no glow, the reeds out of place.
+// The state before the landing: the mark out of place and unseen.
 - (void)prepare;
-// Plays the landing, then runs `landed` as the last reed starts to settle; under Reduce Motion the reeds
-// and the glow fade in where they are.
+// Plays the landing, then runs `landed` as the mark settles; under Reduce Motion it only fades in where it is.
 - (void)landThen:(void (^)(void))landed;
 @end
 
 @implementation SGTourLogo {
-    CAGradientLayer *_glow;
-    UIView *_pane;
-    NSArray<UIVisualEffectView *> *_reeds;
-    NSArray<CAGradientLayer *> *_flutes;
+    UIImageView *_mark;
 }
-
-static const NSUInteger kReeds = 5;
-
-// Clear glass, the style for what sits over something bright, so the glow keeps its light through it.
-static UIVisualEffect *reedEffect(void) {
-    Class glass = NSClassFromString(@"UIGlassEffect");
-    if ([glass respondsToSelector:@selector(effectWithStyle:)]) return [glass effectWithStyle:1];
-    return SGGlassEffect();
-}
-static const CGFloat kLogoRadius = 22;
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.isAccessibilityElement = YES;
-    self.accessibilityLabel = @"Vitrine";
+    self.accessibilityLabel = @"Spotify";
     self.accessibilityTraits = UIAccessibilityTraitImage;
-
-    _pane = [UIView new];
-    _pane.clipsToBounds = YES;
-    _pane.layer.cornerRadius = kLogoRadius;
-    _pane.layer.cornerCurve = kCACornerCurveContinuous;
-    _pane.layer.borderWidth = 1;
-    _pane.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
-    [self addSubview:_pane];
-
-    // The icon's palette: a light core going to Apple Music red, then violet, then the dark around it.
-    _glow = [CAGradientLayer layer];
-    _glow.type = kCAGradientLayerRadial;
-    _glow.colors = @[(id)[UIColor colorWithRed:1 green:0.93 blue:0.9 alpha:1].CGColor,
-                     (id)[UIColor colorWithRed:0.98 green:0.18 blue:0.28 alpha:1].CGColor,
-                     (id)[UIColor colorWithRed:0.55 green:0.2 blue:0.85 alpha:1].CGColor,
-                     (id)[UIColor colorWithRed:0.08 green:0.04 blue:0.1 alpha:1].CGColor];
-    _glow.locations = @[@0, @0.35, @0.7, @1];
-    _glow.startPoint = CGPointMake(0.45, 0.5);
-    _glow.endPoint = CGPointMake(1.05, 1.1);
-    [_pane.layer addSublayer:_glow];
-
-    // Each reed is a flute: shade where its curve turns away on the right, a line of light on the left.
-    NSMutableArray<UIVisualEffectView *> *reeds = [NSMutableArray array];
-    NSMutableArray<CAGradientLayer *> *flutes = [NSMutableArray array];
-    for (NSUInteger i = 0; i < kReeds; i++) {
-        UIVisualEffectView *reed = [[UIVisualEffectView alloc] initWithEffect:reedEffect()];
-        reed.userInteractionEnabled = NO;
-        reed.clipsToBounds = YES;
-        CAGradientLayer *flute = [CAGradientLayer layer];
-        flute.startPoint = CGPointMake(0, 0.5);
-        flute.endPoint = CGPointMake(1, 0.5);
-        flute.colors = @[(id)[UIColor colorWithWhite:1 alpha:0].CGColor, (id)[UIColor colorWithWhite:1 alpha:0.45].CGColor,
-                         (id)[UIColor colorWithWhite:1 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
-                         (id)[UIColor colorWithWhite:0 alpha:0.35].CGColor];
-        flute.locations = @[@0.08, @0.16, @0.3, @0.6, @1];
-        [reed.contentView.layer addSublayer:flute];
-        [flutes addObject:flute];
-        [_pane addSubview:reed];
-        [reeds addObject:reed];
-    }
-    _reeds = reeds;
-    _flutes = flutes;
+    _mark = [[UIImageView alloc] initWithImage:SGTourMarkImage()];
+    _mark.contentMode = UIViewContentModeScaleAspectFit;
+    _mark.userInteractionEnabled = NO;
+    [self addSubview:_mark];
     return self;
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _pane.frame = self.bounds;
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    _glow.frame = _pane.bounds;
-    CGFloat width = self.bounds.size.width / kReeds, height = self.bounds.size.height;
-    for (NSUInteger i = 0; i < kReeds; i++) {
-        UIVisualEffectView *reed = _reeds[i];
-        // Frames are laid out under the identity transform the landing ends on.
-        CGAffineTransform transform = reed.transform;
-        reed.transform = CGAffineTransformIdentity;
-        reed.frame = CGRectMake(i * width, 0, width, height);
-        reed.transform = transform;
-        _flutes[i].frame = reed.bounds;
-    }
-    [CATransaction commit];
+    _mark.frame = self.bounds;
 }
 
 - (void)prepare {
     BOOL reduce = UIAccessibilityIsReduceMotionEnabled();
-    _glow.opacity = 0;
-    for (NSUInteger i = 0; i < kReeds; i++) {
-        _reeds[i].effect = nil;
-        _reeds[i].contentView.alpha = 0;
-        // Alternate reeds come from above and below, the middle one from furthest, so the pane closes
-        // on itself rather than sliding in from one side.
-        CGFloat from = (i % 2 ? -1 : 1) * (28 + 10 * (CGFloat)(2 - labs((long)i - 2)));
-        if (!reduce) _reeds[i].transform = CGAffineTransformScale(CGAffineTransformMakeTranslation(0, from), 0.94, 0.94);
-    }
+    _mark.alpha = 0;
+    if (!reduce) _mark.transform = CGAffineTransformScale(CGAffineTransformMakeTranslation(0, 12), 0.92, 0.92);
 }
 
 - (void)landThen:(void (^)(void))landed {
     BOOL reduce = UIAccessibilityIsReduceMotionEnabled();
-
-    CABasicAnimation *glow = [CABasicAnimation animationWithKeyPath:@"opacity"];
-    glow.fromValue = @0;
-    glow.toValue = @1;
-    glow.duration = 0.5;
-    glow.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.23 :1 :0.32 :1];
-    _glow.opacity = 1;
-    [_glow addAnimation:glow forKey:@"in"];
-
     if (reduce) {
-        [UIView animateWithDuration:0.3 animations:^{
-            for (UIVisualEffectView *reed in self->_reeds) {
-                reed.effect = reedEffect();
-                reed.contentView.alpha = 1;
-            }
-        }];
+        [UIView animateWithDuration:0.3 animations:^{ self->_mark.alpha = 1; }];
         if (landed) landed();
         return;
     }
-    // A landing has a little give: damping 0.8, the reeds 50 ms apart.
-    const NSTimeInterval stagger = 0.05, flight = 0.55;
-    for (NSUInteger i = 0; i < kReeds; i++) {
-        UIVisualEffectView *reed = _reeds[i];
-        UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:flight dampingRatio:0.8 animations:^{
-            reed.transform = CGAffineTransformIdentity;
-            reed.effect = reedEffect();
-            reed.contentView.alpha = 1;
-        }];
-        [animator startAnimationAfterDelay:0.1 + i * stagger];
-    }
+    // A landing with a little give, the page starting as the mark is half settled.
+    UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc] initWithDuration:0.55 dampingRatio:0.78 animations:^{
+        self->_mark.alpha = 1;
+        self->_mark.transform = CGAffineTransformIdentity;
+    }];
+    [animator startAnimationAfterDelay:0.1];
     if (landed) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((0.1 + (kReeds - 1) * stagger + flight * 0.5) * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), landed);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), landed);
     }
 }
 
@@ -587,8 +493,11 @@ static BOOL adFree(void) {
 }
 
 // The look and the ad switches are read at launch, so a choice that differs from the running one ends the
-// tour in a restart.
+// tour in a restart. The first run always ends in one, whatever the switches say: the tour writes them and they
+// only take effect on the next launch, so a first run that offered no restart would leave the person on the look
+// the mod started with. The tour opened again from the settings keeps the shorter way out when nothing changed.
 - (BOOL)needsRestart {
+    if (!SGEnabled(SGKeyOnboardingSeen)) return YES;
     return _redesigned.selected != SGRedesignedUI() || (_ads.on && !adFree());
 }
 
@@ -602,10 +511,12 @@ static BOOL adFree(void) {
 // Below iOS 26 the note above the button has said what the redesign risks there, so picking it and
 // going on is the warning accepted (SGSetRedesignedUI stores that).
 - (void)finish {
+    // Asked before the tour marks itself seen: the first run's restart is decided by that very flag.
+    BOOL restart = self.needsRestart;
     SGSetEnabled(SGKeyOnboardingSeen, YES);
     SGSetRedesignedUI(_redesigned.selected);
     if (_ads.on) for (NSString *key in adKeys()) SGSetEnabled(key, YES);
-    if (self.needsRestart) {
+    if (restart) {
         SGRestartSpotify();
         return;
     }

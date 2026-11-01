@@ -356,6 +356,21 @@ static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
     CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
     CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
+    // The header's row is carried along as the page moves under it (the pull, the scroll), and the pill is not:
+    // it keeps the height it first had, and the avatar is held to that height with it, so the ring the pill wears
+    // stays where it was put rather than travelling with the avatar.
+    static BOOL haveMidY;
+    static CGFloat fixedMidY;
+    if (!haveMidY) {
+        fixedMidY = midY;
+        haveMidY = YES;
+    }
+    midY = fixedMidY;
+    if (face) {
+        CGPoint slot = [header convertPoint:CGPointMake(CGRectGetMidX(faceFrame), midY) toView:stack];
+        if (fabs(face.center.y - slot.y) > 0.5) face.center = CGPointMake(face.center.x, slot.y);
+        faceFrame.origin.y = midY - faceFrame.size.height / 2;
+    }
     CGRect pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
     place(glass, pill);
     place(buttons, pill);
@@ -420,6 +435,9 @@ static void followScroll(UIScrollView *scroll) {
     riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), YES);
     rise(objc_getAssociatedObject(sg_header, &kButtonsKey), CGAffineTransformIdentity, 1);
     if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, CGAffineTransformIdentity, 1);
+    // A pull moves the row between the page's layout passes, and the pill does not go with it: it is laid out
+    // again on the scroll itself, so a downward swipe under the finger leaves the ring where it stands.
+    if (SGRHomeLook() && sg_stack && sg_face) layoutPill(sg_header, sg_stack, sg_face);
 }
 
 @interface SGRHomeTitleFollower : NSObject

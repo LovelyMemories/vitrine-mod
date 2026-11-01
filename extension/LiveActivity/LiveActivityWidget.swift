@@ -7,6 +7,7 @@
 import ActivityKit
 import AppIntents
 import SwiftUI
+import UIKit
 import WidgetKit
 
 private let green = Color(red: 0.12, green: 0.84, blue: 0.38)
@@ -14,6 +15,42 @@ private let idle = Color.white.opacity(0.08)
 
 private typealias State = SGLyricsAttributes.ContentState
 private typealias Tab = SGLyricsAttributes.Tab
+
+extension SGLyricsAttributes.ContentState {
+    // The cover the app sent (a few dozen pixels, JPEG), as an image; nil until it has one.
+    var coverImage: UIImage? { cover.flatMap { UIImage(data: $0) } }
+}
+
+// The player's look on the card: the cover blurred behind it and held dark under the text, in the colour the
+// cover gives, so the card is the song's rather than black.
+private struct CardBackground: View {
+    let state: State
+
+    var body: some View {
+        ZStack {
+            cardTint(state.tint)
+            if let image = state.coverImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 26)
+                    .opacity(0.9)
+            }
+            LinearGradient(colors: [.black.opacity(0.28), .black.opacity(0.64)], startPoint: .top, endPoint: .bottom)
+        }
+        .clipped()
+    }
+}
+
+// "#RRGGBB" from the app, black when it sent none.
+private func cardTint(_ hex: String) -> Color {
+    var digits = hex
+    if digits.hasPrefix("#") { digits.removeFirst() }
+    guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return .black }
+    return Color(red: Double((value >> 16) & 0xFF) / 255,
+                 green: Double((value >> 8) & 0xFF) / 255,
+                 blue: Double(value & 0xFF) / 255)
+}
 
 @main
 struct SGLiveActivityBundle: WidgetBundle {
@@ -43,14 +80,17 @@ extension SGLyricsAttributes.Tab {
 struct SGLyricsLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: SGLyricsAttributes.self) { context in
-            ContentView(state: context.state, upNext: 4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, context.state.view == .panel ? 12 : 16)
-                .padding(.vertical, 12)
-                .foregroundStyle(.white)
-                .activityBackgroundTint(Color.black.opacity(0.75))
-                .activitySystemActionForegroundColor(.white)
-                .widgetURL(URL(string: "spotify:"))
+            ZStack {
+                CardBackground(state: context.state)
+                ContentView(state: context.state, upNext: 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, context.state.view == .panel ? 12 : 16)
+                    .padding(.vertical, 12)
+            }
+            .foregroundStyle(.white)
+            .activityBackgroundTint(cardTint(context.state.tint).opacity(0.85))
+            .activitySystemActionForegroundColor(.white)
+            .widgetURL(URL(string: "spotify:"))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.bottom) {
@@ -105,18 +145,28 @@ private struct LyricsView: View {
     let state: State
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(state.line)
-                .font(.title3.weight(.bold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
-                .direction(of: state.line)
-            if !state.nextLine.isEmpty {
-                Text(state.nextLine)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .lineLimit(1)
-                    .direction(of: state.nextLine)
+        HStack(alignment: .center, spacing: 10) {
+            // The player draws the cover beside the line, small and sharp; the card does the same.
+            if let image = state.coverImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(state.line)
+                    .font(.system(size: 17, weight: .bold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .direction(of: state.line)
+                if !state.nextLine.isEmpty {
+                    Text(state.nextLine)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                        .direction(of: state.nextLine)
+                }
             }
         }
     }

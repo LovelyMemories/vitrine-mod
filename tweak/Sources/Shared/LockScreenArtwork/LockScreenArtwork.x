@@ -2,15 +2,12 @@
 // is put on every dictionary that goes out, so the lock screen lyrics' rewrites carry it too.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "LockScreenArtwork.h"
-#import "SGAppleArtwork.h"
 #import "SGArtworkFile.h"
 #import "SGCanvas.h"
 #import "Headers/SPTPlayer.h"
-#import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Player/PlayerState.h"
-
-static NSString *const kCanvazAddress = @"https://spclient.wg.spotify.com/canvaz-cache/v0/canvases";
 
 // Spotify sets the now playing info from several threads; what the hook reads is behind the lock and
 // everything else is main thread.
@@ -20,6 +17,10 @@ static CFAbsoluteTime sg_infoAt;
 static MPMediaItemArtwork *sg_cover;
 static id sg_artwork;
 static NSString *sg_key;
+
+// Tracks that turned out to have no clip this launch: asking again for one of them is a request and a catalog
+// search for an answer already known, and the player reports the same track again on every pause and skip.
+static NSMutableSet<NSString *> *sg_withoutClip;
 
 static NSString *sg_wanted;
 static NSString *sg_playing;   // the source the artwork set for sg_wanted came from
@@ -99,81 +100,30 @@ static void resend(void) {
     MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo = now;
 }
 
-static void play(NSString *uri, SGCanvas *canvas, NSString *source) {
-    SGLog(@"lock artwork: clip for %@ from %@: %@", uri, source, canvas.address);
-    SGArtworkFetch(canvas.identifier, canvas.address, ^(NSURL *file, NSString *note) {
-        SGLog(@"lock artwork: %@ %@", canvas.identifier, note);
-        if (!file) return;
-        SGArtworkCrop(file, canvas.identifier, sg_aspect, ^(NSURL *ready, NSString *cropNote) {
-            SGLog(@"lock artwork: %@ %@", canvas.identifier, cropNote);
-            if (!ready) return;
-            SGArtworkFirstFrame(ready, ^(CGImageRef frame) {
-                UIImage *still = frame ? [UIImage imageWithCGImage:frame] : nil;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (![sg_wanted isEqualToString:uri]) return;
-                    id artwork = artworkFor([canvas.identifier stringByAppendingString:uri], ready, still);
-                    @synchronized (sg_lock) {
-                        sg_artwork = artwork;
-                        sg_key = sg_offered;
-                    }
-                    sg_playing = source;
-                    SGLog(@"lock artwork: %@ set under %@", uri, sg_offered);
-                    resend();
-                });
+// One clip on the card: the file the mod's own moving artwork already found and downloaded
+// (Shared/AnimatedArtwork, the same store the player and the album and artist headers read), cropped to the
+// shape the now playing key wants and wrapped for the system. Sharing that store is what keeps a song from
+// being fetched twice, once for the player and once for the lock screen.
+static void useClip(NSString *uri, NSURL *file, NSString *source) {
+    SGLog(@"lock artwork: clip for %@ from %@: %@", uri, source, file.lastPathComponent);
+    NSString *identifier = [source stringByAppendingString:uri];
+    SGArtworkCrop(file, identifier, sg_aspect, ^(NSURL *ready, NSString *cropNote) {
+        SGLog(@"lock artwork: %@ %@", uri, cropNote);
+        if (!ready) return;
+        SGArtworkFirstFrame(ready, ^(CGImageRef frame) {
+            UIImage *still = frame ? [UIImage imageWithCGImage:frame] : nil;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (![sg_wanted isEqualToString:uri]) return;
+                id artwork = artworkFor(identifier, ready, still);
+                @synchronized (sg_lock) {
+                    sg_artwork = artwork;
+                    sg_key = sg_offered;
+                }
+                sg_playing = source;
+                SGLog(@"lock artwork: %@ set under %@", uri, sg_offered);
+                resend();
             });
         });
-    });
-}
-
-// Spotify's own headers, read off its next request (Shared/Lyrics), carry the token: the mod never keeps one.
-static void askCanvaz(NSString *uri, void (^done)(SGCanvas *canvas, NSString *note)) {
-    NSData *body = SGCanvazRequestBody(uri);
-    __block NSDictionary<NSString *, NSString *> *headers = nil;
-    SGSpclientHeaders(^(NSDictionary<NSString *, NSString *> *seen) { headers = seen; });
-    if (!headers.count || !body) {
-        done(nil, @"no token for canvaz yet");
-        return;
-    }
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:kCanvazAddress]];
-    request.HTTPMethod = @"POST";
-    request.HTTPBody = body;
-    request.allowsConstrainedNetworkAccess = NO;
-    [headers enumerateKeysAndObjectsUsingBlock:^(NSString *name, NSString *value, BOOL *stop) {
-        [request setValue:value forHTTPHeaderField:name];
-    }];
-    [request setValue:@"application/x-protobuf" forHTTPHeaderField:@"Content-Type"];
-    [[NSURLSession.sharedSession dataTaskWithRequest:request completionHandler:^(NSData *answer, NSURLResponse *response, NSError *error) {
-        SGCanvas *canvas = SGCanvazFromBody(answer);
-        NSString *note = [NSString stringWithFormat:@"canvaz status %ld, %lu bytes, error %@",
-                          (long)[(NSHTTPURLResponse *)response statusCode], (unsigned long)answer.length, error.localizedDescription];
-        dispatch_async(dispatch_get_main_queue(), ^{ done(canvas, note); });
-    }] resume];
-}
-
-// One source's clip for the track, on the main queue; nil when it has none.
-static void ask(NSString *source, NSString *uri, SPTPlayerTrack *track, SGCanvas *fromMetadata, void (^done)(SGCanvas *canvas, NSString *note)) {
-    if ([source isEqualToString:SGArtworkSourceSpotify]) {
-        if (fromMetadata) done(fromMetadata, @"track metadata");
-        else askCanvaz(uri, done);
-        return;
-    }
-    NSDictionary *metadata = [track respondsToSelector:@selector(metadata)] ? track.metadata : nil;
-    SGAppleArtworkFind(metadata[@"artist_name"] ?: track.artistName, metadata[@"album_title"], sg_aspect < 0.9, done);
-}
-
-static void walk(NSString *uri, SPTPlayerTrack *track, SGCanvas *fromMetadata, NSArray<NSString *> *order, NSUInteger at) {
-    if (at >= order.count) {
-        SGLog(@"lock artwork: no clip for %@ from %@", uri, order.count ? [order componentsJoinedByString:@", "] : @"no source");
-        return;
-    }
-    ask(order[at], uri, track, fromMetadata, ^(SGCanvas *canvas, NSString *note) {
-        if (![sg_wanted isEqualToString:uri]) return;
-        if (canvas.video) {
-            play(uri, canvas, order[at]);
-            return;
-        }
-        SGLog(@"lock artwork: %@ has no clip for %@ (%@)", order[at], uri, canvas ? @"a still canvas" : note);
-        walk(uri, track, fromMetadata, order, at + 1);
     });
 }
 
@@ -191,7 +141,6 @@ static void resolve(SPTPlayerTrack *track) {
     if (!SGFlag(SGKeyAnimatedLockArtwork, YES)) {
         if (sg_wanted) {
             sg_wanted = nil;
-            SGArtworkCancelFetch();
             sg_playing = nil;
             @synchronized (sg_lock) {
                 sg_artwork = nil;
@@ -203,26 +152,39 @@ static void resolve(SPTPlayerTrack *track) {
         return;
     }
     if (!keyOffered()) return;
+    NSDictionary *metadata = [track respondsToSelector:@selector(metadata)] ? track.metadata : nil;
     NSString *uri = SGURIString(track.URI);
-    SGCanvas *canvas = SGCanvasFromMetadata([track respondsToSelector:@selector(metadata)] ? track.metadata : nil);
+    SGCanvas *canvas = SGCanvasFromMetadata(metadata);
+    // Asked once already this launch and no source had one; a Canvas that turned up in a later state is news.
+    if (uri && !canvas && [sg_withoutClip containsObject:uri]) return;
     // Pause, shuffle and the like report the same track again; only metadata that landed late is news.
     static BOOL fromMetadata;
     BOOL same = uri == sg_wanted || [uri isEqualToString:sg_wanted];
     if (same && (fromMetadata || !canvas)) return;
     fromMetadata = canvas != nil;
-    NSArray<NSString *> *order = SGArtworkOrder();
     // A Canvas landing late is no news with Spotify off, or with a source asked before it already playing.
-    NSUInteger spotifyAt = [order indexOfObject:SGArtworkSourceSpotify];
+    NSArray<NSString *> *order = SGMotionSourceOrder();
+    NSUInteger spotifyAt = [order indexOfObject:@"canvas"];
     if (same && (spotifyAt == NSNotFound || (sg_playing && [order indexOfObject:sg_playing] < spotifyAt))) return;
     sg_wanted = uri;
     sg_playing = nil;
-    SGArtworkCancelFetch();
     @synchronized (sg_lock) {
         sg_artwork = nil;
         sg_key = nil;
     }
     if (!uri) return;
-    walk(uri, track, canvas, order, 0);
+    NSString *artist = metadata[@"artist_name"] ?: track.artistName;
+    SGMotionShape shape = sg_aspect < 0.9 ? SGMotionTall : SGMotionSquare;
+    SGMotionClipFor(uri, canvas.address ? [NSURL URLWithString:canvas.address] : nil, artist, metadata[@"album_title"],
+                    shape, SGMotionPixels(), ^(NSURL *file, NSString *source) {
+        if (![sg_wanted isEqualToString:uri]) return;
+        if (!file) {
+            [sg_withoutClip addObject:uri];
+            SGLog(@"lock artwork: no clip for %@ from %@", uri, [order componentsJoinedByString:@", "]);
+            return;
+        }
+        useClip(uri, file, source);
+    });
 }
 
 @interface SGArtworkWatcher : NSObject <SGPlayerStateObserver>
@@ -265,6 +227,7 @@ static SGArtworkWatcher *sg_watcher;
         return;
     }
     sg_lock = [NSObject new];
+    sg_withoutClip = [NSMutableSet set];
     sg_watcher = [SGArtworkWatcher new];
     SGAddPlayerStateObserver(sg_watcher);
     %init;

@@ -357,7 +357,6 @@ static void topLost(UICollectionView *list) {
     sg_topFeed = nil;
     sg_blocksKnown = NO;
     sg_largeShelf = nil;
-    SGRHomeSetPageTint(nil);
     static Class shelf;
     if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
     for (UICollectionViewCell *cell in list.visibleCells) {
@@ -372,7 +371,6 @@ static void topLost(UICollectionView *list) {
 static void dropLarge(UICollectionView *shelf) {
     objc_setAssociatedObject(shelf.collectionViewLayout, &kLargeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (sg_largeShelf == shelf) sg_largeShelf = nil;
-    SGRHomeSetPageTint(nil);
     [shelf.collectionViewLayout invalidateLayout];
     __weak UICollectionView *weakShelf = shelf;
     dispatch_async(dispatch_get_main_queue(), ^{ [weakShelf reloadData]; });
@@ -626,7 +624,6 @@ static void tintCard(UIView *card, UIImageView *cover) {
     if (!SGEnabled(SGRKeyHomeTopPicksColour)) {
         objc_setAssociatedObject(card, &kShownKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         setColor(parts, nil, NO);
-        if (isFirstCard(card)) SGRHomeSetPageTint(nil);
         return;
     }
     // A cover Spotify is loading again (back on Home) has no image for a moment: the colors stay until it comes,
@@ -641,7 +638,6 @@ static void tintCard(UIView *card, UIImageView *cover) {
         if (!strongCard || objc_getAssociatedObject(strongCard, &kShownKey) != image) return;
         SGRLargeCardParts *now = objc_getAssociatedObject(strongCard, &kPartsKey);
         if (now) setColor(now, color, YES);
-        if (isFirstCard(strongCard)) SGRHomeSetPageTint(color);
     });
 }
 

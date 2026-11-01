@@ -4,6 +4,7 @@
 // playing in the background, so the timer keeps running there too, and with it the sleep timer.
 // The activity is started only while the app is in front, the one place ActivityKit allows it.
 #import <UIKit/UIKit.h>
+#import <MediaPlayer/MediaPlayer.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
 #import "Headers/SPTPlayer.h"
@@ -16,7 +17,7 @@ API_AVAILABLE(ios(17.0))
 + (void)showWithView:(NSInteger)view paused:(BOOL)paused line:(NSString *)line nextLine:(NSString *)nextLine
               titles:(NSArray<NSString *> *)titles artists:(NSArray<NSString *> *)artists uris:(NSArray<NSString *> *)uris
                  tab:(NSInteger)tab title:(NSString *)title artist:(NSString *)artist shuffle:(BOOL)shuffle repeatMode:(NSInteger)repeatMode
-            timerEnd:(NSDate *)timerEnd timerEndOfTrack:(BOOL)timerEndOfTrack;
+            timerEnd:(NSDate *)timerEnd timerEndOfTrack:(BOOL)timerEndOfTrack cover:(NSData *)cover tint:(NSString *)tint;
 + (void)end;
 @end
 
@@ -147,6 +148,69 @@ static void checkSleepTimer(id<SPTPlayer> player, SPTPlayerState *state, NSStrin
     SGLog(@"live activity: sleep timer up, paused");
 }
 
+
+// The player's look on the card: the cover as a thumbnail and blurred behind the card, and the colour it gives
+// the card's background. The cover is the now playing artwork Spotify sets on every track, cut to 48 px and kept
+// as JPEG; both are worked out once per track, never on a tick that changes nothing else.
+static NSString *sg_coverTrack;
+static NSData *sg_coverData;
+static NSString *sg_coverTint = @"";
+
+static NSString *hexOf(UIColor *color) {
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (![color getRed:&r green:&g blue:&b alpha:&a]) return @"";
+    return [NSString stringWithFormat:@"#%02lX%02lX%02lX", (unsigned long)lround(r * 255), (unsigned long)lround(g * 255), (unsigned long)lround(b * 255)];
+}
+
+// The cover's colour as one pixel: the whole picture drawn into 1x1, which is its average, and read back.
+static UIColor *averageColor(UIImage *image) {
+    if (!image.CGImage) return nil;
+    unsigned char bytes[4] = {0, 0, 0, 255};
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(bytes, 1, 1, 8, 4, space, kCGImageAlphaNoneSkipLast);
+    CGColorSpaceRelease(space);
+    if (!context) return nil;
+    CGContextDrawImage(context, CGRectMake(0, 0, 1, 1), image.CGImage);
+    CGContextRelease(context);
+    return [UIColor colorWithRed:bytes[0] / 255.0 green:bytes[1] / 255.0 blue:bytes[2] / 255.0 alpha:1];
+}
+
+static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
+    if (trackID && [trackID isEqualToString:sg_coverTrack]) {
+        *data = sg_coverData;
+        *tint = sg_coverTint;
+        return;
+    }
+    sg_coverData = nil;
+    sg_coverTint = @"";
+    MPNowPlayingInfoCenter *center = MPNowPlayingInfoCenter.defaultCenter;
+    id artwork = center.nowPlayingInfo[MPMediaItemPropertyArtwork];
+    UIImage *image = [artwork respondsToSelector:@selector(imageWithSize:)] ? [artwork imageWithSize:CGSizeMake(96, 96)] : nil;
+    // Not in yet: the info comes a moment after the track does, so the track is asked again on the next tick
+    // rather than being remembered with no cover.
+    if (!image.CGImage) {
+        sg_coverTrack = nil;
+        *tint = @"";
+        return;
+    }
+    sg_coverTrack = trackID;
+    CGSize size = CGSizeMake(48, 48);
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    UIImage *small = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        [image drawInRect:CGRectMake(0, 0, size.width, size.height)];
+    }];
+    sg_coverData = UIImageJPEGRepresentation(small, 0.4);
+    // Held dark, the way the player holds its field: white text keeps its contrast on any cover.
+    UIColor *color = averageColor(image);
+    CGFloat hue = 0, saturation = 0, brightness = 0, alpha = 1;
+    if ([color getHue:&hue saturation:&saturation brightness:&brightness alpha:&alpha]) {
+        color = [UIColor colorWithHue:hue saturation:MIN(saturation, 0.6) brightness:MIN(brightness, 0.55) alpha:1];
+    }
+    sg_coverTint = hexOf(color);
+    *data = sg_coverData;
+    *tint = sg_coverTint;
+}
+
 static void tick(void) API_AVAILABLE(ios(17.0)) {
     id<SPTPlayer> player = SGKaraokePlayer();
     SPTPlayerState *state = player.state;
@@ -181,14 +245,19 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
     NSDate *sleepEnd = sg_sleepEnd;
     BOOL endOfTrack = sg_sleepTrack != nil;
 
+    NSData *cover = nil;
+    NSString *tint = @"";
+    coverFor(trackID, &cover, &tint);
+
     NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithObjects:@(view).stringValue, paused ? @"1" : @"0", line, next,
         @(tab).stringValue, title, artist, shuffle ? @"1" : @"0", @(repeatMode).stringValue,
-        @((long long)sleepEnd.timeIntervalSince1970).stringValue, endOfTrack ? @"1" : @"0", nil];
+        @((long long)sleepEnd.timeIntervalSince1970).stringValue, endOfTrack ? @"1" : @"0", tint,
+        @(cover.length).stringValue, nil];
     for (NSUInteger i = 0; i < titles.count; i++) [parts addObject:[NSString stringWithFormat:@"%@\t%@\t%@", titles[i], artists[i], uris[i]]];
     send([parts componentsJoinedByString:@"\n"], ^{
         [SGLiveActivityBridge showWithView:view paused:paused line:line nextLine:next titles:titles artists:artists uris:uris
                                         tab:tab title:title artist:artist shuffle:shuffle repeatMode:repeatMode
-                                   timerEnd:sleepEnd timerEndOfTrack:endOfTrack];
+                                   timerEnd:sleepEnd timerEndOfTrack:endOfTrack cover:cover tint:tint];
     });
 }
 
@@ -202,6 +271,12 @@ static void playQueued(NSString *uri) {
     }
     if (!target || ![player respondsToSelector:@selector(skipToNextTrackWithOptions:track:)]) {
         SGLog(@"live activity: cannot play %@ (in the queue: %@, player %@)", uri, target ? @"yes" : @"no", player ? NSStringFromClass([player class]) : @"nil");
+        // The card was drawn before the queue moved on. Sending the state again gives it the real one, so the
+        // tap that went nowhere at least leaves the card showing what is up next now.
+        if (@available(iOS 17.0, *)) {
+            sg_shown = nil;
+            if (sg_timer) tick();
+        }
         return;
     }
     id result = [player skipToNextTrackWithOptions:nil track:target];

@@ -248,7 +248,6 @@ static void refresh(UIView *tile) {
     if (!image) {
         objc_setAssociatedObject(tile, &kShownKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         tint(tile, surface, nil, NO);
-        if (leadingTile(tile)) SGRHomeSetShortcutTint(nil);
         return;
     }
     if (objc_getAssociatedObject(tile, &kShownKey) == image) return;
@@ -260,7 +259,6 @@ static void refresh(UIView *tile) {
         // A tile reused for another cover in the meantime has asked for that one.
         if (!strongTile || objc_getAssociatedObject(strongTile, &kShownKey) != image) return;
         tint(strongTile, surfaceIn(strongTile, partsOf(strongTile).fill), color, !scrolling(strongTile));
-        if (leadingTile(strongTile)) SGRHomeSetShortcutTint(color);
     });
 }
 

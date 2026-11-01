@@ -7,3 +7,6 @@
 // Newest first; empty when nothing has crashed.
 NSArray<NSString *> *SGCrashReportPaths(void);
 void SGCrashDeleteAll(void);
+// This launch's own file is dropped before the process ends on purpose (Mod Settings restarts Spotify):
+// a launch that ends by itself is not a crash, and the next launch would report it as one.
+void SGCrashClearPending(void);

@@ -49,48 +49,6 @@ static void prune(void) {
     SGLog(@"lock artwork: cache pruned to %llu KB", total / 1024);
 }
 
-static NSURLSessionDownloadTask *sg_task;
-
-void SGArtworkCancelFetch(void) {
-    NSURLSessionDownloadTask *task = sg_task;
-    sg_task = nil;
-    [task cancel];
-}
-
-void SGArtworkFetch(NSString *identifier, NSString *address, void (^done)(NSURL *file, NSString *note)) {
-    SGArtworkCancelFetch();
-    NSURL *remote = address.length ? [NSURL URLWithString:address] : nil;
-    if (!remote) {
-        done(nil, @"no address");
-        return;
-    }
-    NSURL *local = fileFor([identifier stringByAppendingPathExtension:@"mp4"]);
-    if ([NSFileManager.defaultManager fileExistsAtPath:local.path]) {
-        dispatch_async(queue(), ^{ touch(local); });
-        done(local, @"cached");
-        return;
-    }
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:remote];
-    // Low Data Mode marks the path constrained; the download then fails rather than spending the data.
-    request.allowsConstrainedNetworkAccess = NO;
-    sg_task = [NSURLSession.sharedSession downloadTaskWithRequest:request completionHandler:^(NSURL *temporary, NSURLResponse *response, NSError *error) {
-        if (!temporary) {
-            done(nil, [NSString stringWithFormat:@"download failed: %@", error.localizedDescription]);
-            return;
-        }
-        long long length = response.expectedContentLength;
-        dispatch_async(queue(), ^{
-            NSError *move = nil;
-            [NSFileManager.defaultManager removeItemAtURL:local error:nil];
-            BOOL moved = [NSFileManager.defaultManager moveItemAtURL:temporary toURL:local error:&move];
-            if (moved) prune();
-            done(moved ? local : nil, moved ? [NSString stringWithFormat:@"downloaded %lld KB", length / 1024]
-                                            : [NSString stringWithFormat:@"not kept: %@", move.localizedDescription]);
-        });
-    }];
-    [sg_task resume];
-}
-
 // The size the clip is played at, its rotation applied, and the transform that puts its top left at
 // the origin.
 static CGSize shownSize(AVAssetTrack *track, CGAffineTransform *upright) {

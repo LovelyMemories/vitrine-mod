@@ -39,6 +39,11 @@ struct SGLyricsAttributes: ActivityAttributes {
         var repeatMode: Int   // 0 off, 1 the playlist or album, 2 the track
         var timerEnd: Date?   // the sleep timer's end, nil when none is set
         var timerEndOfTrack: Bool
+        // The player's look: the cover, a few dozen pixels of it as JPEG, drawn blurred behind the card and
+        // sharp beside the line as the player draws its thumbnail, and the colour the cover gives the card.
+        // Both are the app's to read (LiveActivity.x), nil and "" until it has them.
+        var cover: Data?
+        var tint: String      // "#RRGGBB", "" for none
     }
 }
 

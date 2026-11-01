@@ -1,4 +1,5 @@
 #import "SGPrefs.h"
+#import "SGCrash.h"
 #import "SGLog.h"
 #import <os/lock.h>
 
@@ -93,5 +94,7 @@ void SGRestartSpotify(void) {
     // back with the switches as they were before. The CF call does, and the exit gets half a second to follow it.
     CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication);
     SGLog(@"restart: Spotify ends now");
+    // Ending on purpose is not a crash: this launch's report goes with it, or the next launch reports one.
+    SGCrashClearPending();
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ exit(0); });
 }

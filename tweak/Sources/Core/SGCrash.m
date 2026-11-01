@@ -110,32 +110,57 @@ static void prune(void) {
     for (NSUInteger i = 5; i < paths.count; i++) [NSFileManager.defaultManager removeItemAtPath:paths[i] error:nil];
 }
 
+// This launch's own file: its header now, the frames from the handler if it dies.
+static void beginPendingFile(void) {
+    if (sg_pendingFD >= 0) return;
+    NSDateFormatter *formatter = [NSDateFormatter new];
+    formatter.dateFormat = @"yyyy-MM-dd-HH-mm-ss";
+    // "pending-" until the launch ends: a clean exit takes the file away, a crash renames it.
+    NSString *name = [NSString stringWithFormat:@"pending-%@.txt", [formatter stringFromDate:NSDate.date]];
+    NSString *path = [crashDirectory() stringByAppendingPathComponent:name];
+    strlcpy(sg_pending, path.fileSystemRepresentation, sizeof(sg_pending));
+    // Opened now, so the handler has an fd and nothing to allocate.
+    sg_pendingFD = open(sg_pending, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    NSString *header = [NSString stringWithFormat:@"Vitrine %@ on Spotify %@\niOS %@, %@\nstarted %@\n",
+                        NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"?",
+                        NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?",
+                        NSProcessInfo.processInfo.operatingSystemVersionString, NSProcessInfo.processInfo.hostName, NSDate.date];
+    writeAll(sg_pendingFD, header.UTF8String);
+}
+
+// In the background this launch has not crashed, and iOS ends a backgrounded app without telling it: the
+// file would be renamed into a "crash" by the next launch every time the app was swiped away or evicted.
+// It is taken away when the app goes to the background, and a new one is started when it comes back.
+void SGCrashClearPending(void) {
+    if (sg_pendingFD >= 0) {
+        close(sg_pendingFD);
+        sg_pendingFD = -1;
+    }
+    if (sg_pending[0]) {
+        [[NSFileManager defaultManager] removeItemAtPath:[NSString stringWithUTF8String:sg_pending] error:nil];
+        sg_pending[0] = '\0';
+    }
+}
+
 __attribute__((constructor)) static void SGCrashInstall(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         adoptAbandoned();
         prune();
-        NSDateFormatter *formatter = [NSDateFormatter new];
-        formatter.dateFormat = @"yyyy-MM-dd-HH-mm-ss";
-        // "pending-" until the launch ends: a clean exit takes the file away, a crash renames it.
-        NSString *name = [NSString stringWithFormat:@"pending-%@.txt", [formatter stringFromDate:NSDate.date]];
-        NSString *path = [crashDirectory() stringByAppendingPathComponent:name];
-        strlcpy(sg_pending, path.fileSystemRepresentation, sizeof(sg_pending));
-        // Opened now, so the handler has an fd and nothing to allocate.
-        sg_pendingFD = open(sg_pending, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        NSString *header = [NSString stringWithFormat:@"Vitrine %@ on Spotify %@\niOS %@, %@\nstarted %@\n",
-                            NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"?",
-                            NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"?",
-                            NSProcessInfo.processInfo.operatingSystemVersionString, NSProcessInfo.processInfo.hostName, NSDate.date];
-        writeAll(sg_pendingFD, header.UTF8String);
-
+        beginPendingFile();
         NSSetUncaughtExceptionHandler(&exceptionHandler);
         int signals[] = {SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP};
         for (size_t i = 0; i < sizeof(signals) / sizeof(signals[0]); i++) signal(signals[i], crashSignal);
         // A clean exit leaves no report: the file is this launch's, and this launch did not crash.
-        [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationWillTerminateNotification object:nil queue:nil
-                                                    usingBlock:^(NSNotification *note) {
-            [NSFileManager.defaultManager removeItemAtPath:[NSString stringWithUTF8String:sg_pending] error:nil];
+        NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+        [center addObserverForName:UIApplicationWillTerminateNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            SGCrashClearPending();
+        }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            SGCrashClearPending();
+        }];
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            beginPendingFile();
         }];
         SGLog(@"crash report: %s, taken away when this launch ends cleanly", sg_pending);
     });

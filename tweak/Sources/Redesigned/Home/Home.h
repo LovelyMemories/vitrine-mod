@@ -91,11 +91,6 @@ BOOL SGRHomeInTopPicks(UIView *view);
 // Spotify's "Show all" of the shelf Top picks draws, while the shelf is on screen and offers one, and the shelf's
 // title with it: the header's menu offers it (HomeHeader.x), the heading it sits in being gone.
 UIControl *SGRHomeTopPicksShowAll(NSString **title);
-// The page's color from the first large card's cover (HomeHeader.x draws it behind the title, fading to black);
-// nil for none. The first shortcut tile's cover is the color when no large card has one (SGRHomeSetShortcutTint),
-// so Home keeps Spotify's wash with Top picks off.
-void SGRHomeSetPageTint(UIColor *color);
-void SGRHomeSetShortcutTint(UIColor *color);
 
 // FLEX builds only (HomePerf.x): a hook takes the time as it starts and hands it back as it ends; outside
 // a FLEX build Begin returns 0 and End does nothing.

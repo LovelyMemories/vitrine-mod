@@ -7,6 +7,8 @@ import os
 @objc(SGLiveActivityBridge)
 public final class SGLiveActivityBridge: NSObject {
     private static let log = Logger(subsystem: "spotifyglass", category: "live activity")
+    // What ActivityKit takes of one state, with room left for its own envelope.
+    private static let kStateBudget = 3800
 
     private static var current: Activity<SGLyricsAttributes>? {
         Activity<SGLyricsAttributes>.activities.first { $0.activityState == .active || $0.activityState == .stale }
@@ -64,18 +66,25 @@ public final class SGLiveActivityBridge: NSObject {
     // A new activity can only be requested while the app is in the foreground; an update works from the background.
     // One call per new state. View and tab are SGLiveActivityView's and SGLiveActivityTab's values;
     // titles, artists and URIs pair up by index, the tracks up next; timerEnd is nil without a timer.
+    // cover is the card's artwork and tint its colour, both read off the now playing info.
     @objc public static func show(view: Int, paused: Bool, line: String, nextLine: String,
                                   titles: [String], artists: [String], uris: [String],
                                   tab: Int, title: String, artist: String, shuffle: Bool, repeatMode: Int,
-                                  timerEnd: Date?, timerEndOfTrack: Bool) {
+                                  timerEnd: Date?, timerEndOfTrack: Bool, cover: Data?, tint: String) {
         let tracks = titles.indices.map {
             SGLyricsAttributes.Track(title: titles[$0], artist: artists[$0], uri: uris[$0])
         }
-        let state = SGLyricsAttributes.ContentState(
+        var state = SGLyricsAttributes.ContentState(
             view: SGLyricsAttributes.View(rawValue: view) ?? .lyrics, paused: paused,
             line: line, nextLine: nextLine, tracks: tracks,
             tab: SGLyricsAttributes.Tab(rawValue: tab) ?? .controls, title: title, artist: artist,
-            shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack)
+            shuffle: shuffle, repeatMode: repeatMode, timerEnd: timerEnd, timerEndOfTrack: timerEndOfTrack,
+            cover: cover, tint: tint)
+        // ActivityKit takes about 4 KB of state. A long queue with the cover in it can pass that, and then the
+        // whole update is refused: the cover is dropped instead, and the card keeps its colour.
+        if let encoded = try? JSONEncoder().encode(state), encoded.count > kStateBudget {
+            state.cover = nil
+        }
         let content = ActivityContent(state: state, staleDate: nil)
         if let activity = current {
             queue(.update(activity.id, content))

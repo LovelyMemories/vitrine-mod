@@ -1,8 +1,8 @@
 // What about the install itself can work against the mod, said once and kept at the top of Mod Settings
 // while it lasts: EeveeSpotify injected beside it, a Spotify other than the one it is made for, the redesign without
 // the app changes the IPA build makes, and a
-// redesign below iOS 26 that did not start (Core/SGUIMode.h), which turned itself off. Also what Chroma, installed
-// over the same Spotify before, left behind, offered once for deleting.
+// redesign below iOS 26 that did not start (Core/SGUIMode.h), which turned itself off. What an earlier mod left in
+// the app's storage is no longer offered: that row and its alert are gone.
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Core/SGCore.h"
@@ -11,7 +11,6 @@
 #import "Onboarding.h"
 
 static NSString *const kTold = @"spotifyglass.environment.told";
-static NSString *const kCleanupOffered = @"spotifyglass.environment.chromaCleanupOffered";
 static const NSTimeInterval kSettle = 4;   // after the first activation, behind the signing sheet's 3 s
 static const NSTimeInterval kRetry = 4;
 static const NSInteger kTries = 45;        // three minutes of waiting for the screen, then the rows say it
@@ -95,50 +94,6 @@ static void tell(NSArray<SGProblem> *list) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-// What Chroma, installed over the same Spotify before Vitrine, left in the app's storage that Vitrine never
-// reads: its Karaoke voice model (about 470 MB) and its saved lock screen videos. Its listening history and
-// audio effects are the person's own and stay (AudioEffectsFiles.m moves the effects over).
-static NSArray<NSURL *> *chromaLeftovers(void) {
-    NSFileManager *files = NSFileManager.defaultManager;
-    NSURL *support = [files URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject;
-    NSURL *caches = [files URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
-    NSMutableArray<NSURL *> *found = [NSMutableArray array];
-    for (NSURL *url in @[[support URLByAppendingPathComponent:@"spoti.pw/Sing" isDirectory:YES],
-                         [caches URLByAppendingPathComponent:@"spoti.pw/LockArtwork" isDirectory:YES]]) {
-        if ([files fileExistsAtPath:url.path]) [found addObject:url];
-    }
-    return found;
-}
-
-static NSString *sizeOf(NSArray<NSURL *> *urls) {
-    long long total = 0;
-    for (NSURL *url in urls) {
-        for (NSURL *file in [NSFileManager.defaultManager enumeratorAtURL:url includingPropertiesForKeys:@[NSURLTotalFileAllocatedSizeKey] options:0 errorHandler:nil]) {
-            NSNumber *size = nil;
-            [file getResourceValue:&size forKey:NSURLTotalFileAllocatedSizeKey error:nil];
-            total += size.longLongValue;
-        }
-    }
-    return [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleFile];
-}
-
-static void offerCleanup(void) {
-    NSArray<NSURL *> *leftovers = chromaLeftovers();
-    if (!leftovers.count) return;
-    NSString *size = sizeOf(leftovers);
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"Chroma left %@ on this iPhone", size]
-                                                                  message:@"Its Karaoke voice model and its saved lock screen videos are still in Spotify's storage, and Vitrine uses neither. Your listening history and audio effects stay."
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-            for (NSURL *url in leftovers) [NSFileManager.defaultManager removeItemAtURL:url error:nil];
-            SGLog(@"environment: deleted %@ Chroma left", size);
-        });
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Keep" style:UIAlertActionStyleCancel handler:nil]];
-    [SGTopController() presentViewController:alert animated:YES completion:nil];
-}
-
 // What about the install is worth saying.
 static NSArray<SGProblem> *installProblems(void) {
     NSMutableArray<SGProblem> *list = [NSMutableArray array];
@@ -159,8 +114,6 @@ NSArray<SGModRow *> *SGEnvironmentWarningRows(void) {
                                      ^{ tell(@[version()]); })];
     if (withoutAppChanges())
         [rows addObject:SGWarningRow(@"Installed without the app changes", @"Tap for what that does", ^{ tell(@[appChanges()]); })];
-    if (chromaLeftovers().count)
-        [rows addObject:SGWarningRow(@"Chroma left files behind", [NSString stringWithFormat:@"%@ Vitrine never uses. Tap to delete", sizeOf(chromaLeftovers())], ^{ offerCleanup(); })];
     return rows;
 }
 
@@ -172,7 +125,7 @@ static NSString *state(void) {
 
 static void whenClear(NSInteger tries, void (^then)(void)) {
     UIViewController *top = SGTopController();
-    // The tour, What's new and the signing sheet own the screen first; an alert presented from one of
+    // The tour and the signing sheet own the screen first; an alert presented from one of
     // them lands nowhere, so this one waits its turn. It also waits for the app to be in front, so it is
     // not shown, and counted as told, to someone who sent Spotify away in its first seconds.
     BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
@@ -196,13 +149,6 @@ static void tellProblems(void) {
         [list addObjectsFromArray:installProblems()];
     }
     if (list.count) tell(list);
-    // Chroma's leftovers are offered once, after any problem; the row in Mod Settings stays while they do.
-    if (chromaLeftovers().count && ![store boolForKey:kCleanupOffered]) {
-        whenClear(kTries, ^{
-            [store setBool:YES forKey:kCleanupOffered];
-            offerCleanup();
-        });
-    }
 }
 
 void SGCheckEnvironmentOnce(void) {

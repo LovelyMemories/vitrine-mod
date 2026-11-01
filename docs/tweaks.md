@@ -170,14 +170,17 @@ Shared:
     LockScreenArtwork/ the system's animated lock screen artwork (LockScreenArtwork.h, iOS 26 and up): the track's
                   Canvas, else the album's animated cover on Apple Music, wrapped in MPMediaItemAnimatedArtwork and
                   put under the key MediaPlayer lists (3:4 where the system takes it, else 1:1), so the lock screen
-                  plays a looping clip behind its controls the way Apple Music does. The Canvas comes from the
-                  track's metadata or, where it names none, from Spotify's Canvas service (SGCanvas.m asks with
-                  Spotify's own headers, Shared/Lyrics); Apple Music is searched by artist and album only
-                  (SGAppleArtwork.m). The clip is fetched once into Caches, cropped to the key's shape, and its first
-                  frame filled to the size the system asks for the still (SGArtworkFile.m). Every now playing
-                  dictionary gets the key put back, since the lyrics rewrite that dictionary on a timer, and a clip
-                  that lands late is re-offered by sending the last dictionary again with its position run on.
+                  plays a looping clip behind its controls the way Apple Music does. The clip is not found here: it
+                  asks Shared/AnimatedArtwork for the track's clip (SGMotionClipFor), the store the player and the
+                  album and artist headers read, so a song is looked up and downloaded once for all of them. The file
+                  is cropped to the key's shape and its first frame filled to the size the system asks for the still
+                  (SGArtworkFile.m, no network in it). Every now playing dictionary gets the key put back, since the
+                  lyrics rewrite that dictionary on a timer, and a clip that lands late is re-offered by sending the
+                  last dictionary again with its position run on. A track no source has a clip for is remembered for
+                  the launch, so a pause or a skip does not ask for it again.
                   Sources asked in a fixed order, Spotify's Canvas first; the order page is not in this tree yet.
+                  Its page in Mod Settings ("Lock screen", SGLockScreenPage) holds the one switch, or the row that
+                  says the iPhone needs iOS 26.
     AnimatedArtwork/ moving artwork for the app's own screens (AnimatedArtwork.h): the track's Canvas, else Apple
                   Music's animated album cover (SGMotionCatalog.m: searched without the album's edition, the edition
                   of the same name first, and left alone for 10 minutes after a 403 or 429; an album's answer kept
@@ -566,7 +569,7 @@ Redesigned:
                   its hooks install and Home is as before it): at the trailing edge a glass pill of the filter (a menu that
                   drives Spotify's own chips, with the device picker and the top shelf's Show all) and the avatar, Top picks
                   (the first shelf, or the one Cards from names, found in Spotify's feed model before its cells are built, moved above the shortcuts and drawn as large cards in their
-                  covers' colors with no heading, the page tinted by the first card) and each shortcut tile as a glass pill
+                  covers' colors with no heading, the page itself black) and each shortcut tile as a glass pill
                   in its cover's color with its name in bold on up to two lines; in FLEX builds a meter of each scroll's
                   frames and the hooks' time (Home.h lists its files)
     Search/       the Browse page decluttered to its category cards (an allow list of the list's cells: the watch feed
@@ -642,9 +645,8 @@ App:
                    changes the IPA build makes, as with a .deb injected by hand: Spotify's own glass opt-out set (9.1.88's
                    UIDesignRequiresCompatibility, under the redesign), or NSSupportsLiveActivities or MusicHapticsSupported
                    missing, each named in the warning and the last two under Live Activity and Vibrations too; all but
-                   the third stay as red rows at the top of Mod Settings. What Chroma left in Spotify's storage when Vitrine
-                   replaced it (its Karaoke model and saved lock screen videos, never its listening history or audio
-                   effects) is offered for deleting once, and stays a row there until it goes. Laid out on the simulator by harness/onboarding/
+                   the third stay as red rows at the top of Mod Settings. What an earlier mod left in the app's storage
+                   is no longer reported or offered for deleting. Laid out on the simulator by harness/onboarding/
 
 Every key a feature stores starts with `spotifyglass.`, whatever it holds: Reset all settings on
 the Mod page removes by that prefix and has no list to keep up to date. It leaves `SGKeyStock` behind,

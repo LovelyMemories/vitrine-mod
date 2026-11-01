@@ -25,14 +25,13 @@
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
 static const NSUInteger kTitleTries = 8;
 
-static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kTintKey, kWatchKey;
+static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey;
 // The title row's pill: a glass capsule around the filter button and the avatar, 44pt tall, as the reference has
 // it; the menu drives Spotify's own filter chips, hidden in the stack, and offers the device picker when Spotify
 // has one (a now playing bar) and the large shelf's Show all, its heading being gone (HomeTopPicks.x).
 static const CGFloat kPillHeight = 44, kPillButton = 44, kPillPad = 6;
 // The page's violet wash behind the title, fading to black over this height: it reaches through the header and the
 // first shelf, and is gone by the middle of the screen.
-static const CGFloat kTintHeight = 480;
 
 // The pill's buttons sit above Spotify's stack, which would take every touch in the header otherwise; a touch
 // outside a button goes through to the avatar under them.
@@ -46,13 +45,6 @@ static const CGFloat kTintHeight = 480;
 }
 @end
 
-@interface SGRHomeTintView : UIView
-@end
-@implementation SGRHomeTintView
-+ (Class)layerClass {
-    return CAGradientLayer.class;
-}
-@end
 static NSString *sg_tabName;
 
 static void vanish(UIView *view) {
@@ -288,86 +280,6 @@ static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     return CGRectGetMinX(pill);
 }
 
-#pragma mark - the page's color
-
-static UIColor *sg_pageTint;       // the first large card's cover (Top picks)
-static UIColor *sg_shortcutTint;   // the first shortcut tile's cover, when no large card says one
-static __weak SGRHomeTintView *sg_tintView;
-
-// The color behind the page: a fixed violet, the same whatever plays, so Home looks the same from one song to the
-// next. It used to be the first large card's cover, then the first shortcut's (HomeTiles.x still offers them; the
-// wash just does not take them any more).
-static UIColor *pageTint(void) {
-    static UIColor *violet;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        // #6C33C9, about the violet of the reference: a little blue in it, so the black under it reads as a shade
-        // of the same color rather than a gray.
-        violet = [UIColor colorWithRed:0.424 green:0.200 blue:0.788 alpha:1];
-    });
-    return violet;
-}
-
-static void paintTint(SGRHomeTintView *tint, BOOL animated) {
-    CAGradientLayer *layer = (CAGradientLayer *)tint.layer;
-    UIColor *top = pageTint();
-    // Three stops rather than two: full at the top, still half of it where the first shelf begins, and gone by the
-    // middle of the screen, so the wash is behind the title and the first cards and nothing else.
-    NSArray *colors = @[(id)[top colorWithAlphaComponent:1].CGColor,
-                        (id)[top colorWithAlphaComponent:0.55].CGColor,
-                        (id)[top colorWithAlphaComponent:0].CGColor];
-    NSArray *locations = @[@0, @0.42, @1];
-    if (![layer.locations isEqualToArray:locations]) layer.locations = locations;
-    if ([layer.colors isEqualToArray:colors]) return;
-    if (animated && tint.window) {
-        CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"colors"];
-        fade.fromValue = layer.colors;
-        fade.duration = SGRCrossfade;
-        [layer addAnimation:fade forKey:@"colors"];
-    }
-    layer.colors = colors;
-}
-
-static void repaintTint(void) {
-    if (sg_tintView) paintTint(sg_tintView, YES);
-}
-
-void SGRHomeSetPageTint(UIColor *color) {
-    if (color == sg_pageTint || [color isEqual:sg_pageTint]) return;
-    sg_pageTint = color;
-    repaintTint();
-}
-
-void SGRHomeSetShortcutTint(UIColor *color) {
-    if (color == sg_shortcutTint || [color isEqual:sg_shortcutTint]) return;
-    sg_shortcutTint = color;
-    repaintTint();
-}
-
-// The gradient at the back of the page's view (HomePageView, which holds the feed), the feed's own black cleared so
-// it shows through behind the title and the first shelf; the shelves clear theirs (HomeSections.x).
-static void layoutTint(UIView *view) {
-    __block UIView *page = sg_tintView.superview;
-    if (!page) SGForEachView(view, ^(UIView *v) {
-        if (!page && [v.accessibilityIdentifier hasPrefix:@"HomePageView"]) page = v;
-    });
-    if (!page) return;
-    SGRHomeTintView *tint = objc_getAssociatedObject(page, &kTintKey);
-    if (!tint) {
-        tint = [SGRHomeTintView new];
-        tint.userInteractionEnabled = NO;
-        objc_setAssociatedObject(page, &kTintKey, tint, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        sg_tintView = tint;
-        paintTint(tint, NO);
-    }
-    if (tint.superview != page) [page insertSubview:tint atIndex:0];
-    CGRect frame = CGRectMake(0, 0, page.bounds.size.width, kTintHeight);
-    if (!CGRectEqualToRect(tint.frame, frame)) tint.frame = frame;
-    for (UIView *sub in page.subviews) {
-        if ([sub isKindOfClass:UICollectionView.class] && ![sub.backgroundColor isEqual:UIColor.clearColor]) sub.backgroundColor = UIColor.clearColor;
-    }
-}
-
 static BOOL findHeader(UIView *view) {
     if (sg_stack && [sg_stack isDescendantOfView:view]) return YES;
     for (UIView *wrapper in view.subviews) {
@@ -441,27 +353,13 @@ static void followScroll(UIScrollView *scroll) {
 static char kFollowerKey;
 static __weak UIScrollView *sg_feed;
 static __weak UIView *sg_pageView;
-static void layoutTint(UIView *view);
 static void followFeed(UIScrollView *feed) {
     sg_feed = feed;
-    // The feed's own black would sit over the page's violet: cleared as soon as the feed is seen, which is what the
-    // tint's own pass did too late — Home opened black until another tab and back (2026-10-30).
-    if (![feed.backgroundColor isEqual:UIColor.clearColor]) feed.backgroundColor = UIColor.clearColor;
     if (!objc_getAssociatedObject(feed, &kFollowerKey)) {
         SGRHomeTitleFollower *follower = [SGRHomeTitleFollower new];
         follower.scroll = feed;
         [feed addObserver:follower forKeyPath:@"contentOffset" options:0 context:NULL];
         objc_setAssociatedObject(feed, &kFollowerKey, follower, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    // A feed that arrives after the page's own pass has none behind it: the wash is laid out again now and on the
-    // next turn, once the feed has its size.
-    __weak UIView *page = sg_pageView;
-    if (page) {
-        layoutTint(page);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            UIView *strongPage = page;
-            if (strongPage) layoutTint(strongPage);
-        });
     }
     followScroll(feed);
 }
@@ -534,7 +432,6 @@ static void layoutHeader(UIViewController *page) {
     CGFloat pillLeading = face ? CGRectGetMinX(facePlace(stack, face)) : header.bounds.size.width - SGRSideMargin + SGRGrid;
     if (SGRHomeLook()) {
         pillLeading = layoutPill(header, stack, face);
-        layoutTint(view);
     }
 
     UILabel *title = titleIn(header);

@@ -3,24 +3,6 @@
 #import <MediaPlayer/MediaPlayer.h>
 #import "LockScreenArtwork.h"
 
-NSString *const SGArtworkSourceSpotify = @"spotify";
-NSString *const SGArtworkSourceApple = @"applemusic";
-
-NSArray<NSString *> *SGArtworkOrder(void) {
-    id stored = [NSUserDefaults.standardUserDefaults arrayForKey:SGKeyAnimatedLockArtworkSources];
-    NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : @[SGArtworkSourceSpotify, SGArtworkSourceApple];
-    NSMutableArray<NSString *> *order = [NSMutableArray array];
-    for (id key in keys) {
-        BOOL known = [key isEqual:SGArtworkSourceSpotify] || [key isEqual:SGArtworkSourceApple];
-        if (known && ![order containsObject:key]) [order addObject:key];
-    }
-    return order;
-}
-
-void SGArtworkSetOrder(NSArray<NSString *> *order) {
-    [NSUserDefaults.standardUserDefaults setObject:order ?: @[] forKey:SGKeyAnimatedLockArtworkSources];
-}
-
 BOOL SGAnimatedArtworkAvailable(void) {
     if (@available(iOS 26.0, *)) return MPMediaItemAnimatedArtwork.class != nil;
     return NO;

@@ -101,11 +101,12 @@ static UIViewController *modSettingsPage(void) {
                                      ^UIViewController *{ return SGLiveActivitySettingsPage(); });
     liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
     [features addObject:liveActivity];
-    [sections addObject:SGSection(nil, features)];
-
-    // The lock screen takes Spotify's artwork from Spotify; this hands the system a clip of the mod's own
+    // The lock screen takes Spotify's artwork from Spotify; its page hands the system a clip of the mod's own
     // (Shared/LockScreenArtwork). It draws on no Spotify screen, so both looks have it.
-    [sections addObject:SGSection(@"Lock screen", SGAnimatedArtworkRows())];
+    SGModRow *lockScreen = pageRow(@"Lock screen", @"lock.fill", UIColor.systemTealColor,
+                                   ^UIViewController *{ return SGLockScreenPage(); });
+    [features addObject:lockScreen];
+    [sections addObject:SGSection(nil, features)];
 
     [sections addObjectsFromArray:@[
         SGSection(nil, @[

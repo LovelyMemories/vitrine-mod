@@ -17,7 +17,9 @@
 // the way the redesign takes any view out of a stack Spotify arranges (Kit/SGRRestyle.h).
 //
 // The title is Spotify's own name for the tab, read off its tab bar item (id=TabBar.Item.Home, 10.txt:3100),
-// so it follows the app's language.
+// so it follows the app's language. The filter pill wears the same turning rainbow rim as the Mod Settings
+// switches (Settings/SGGlowSwitch.m), drawn inside the glass so it scrolls and fades with it.
+#import <math.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -25,7 +27,7 @@
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
 static const NSUInteger kTitleTries = 8;
 
-static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey;
+static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey;
 // The title row's pill: a glass capsule around the filter button and the avatar, 44pt tall, as the reference has
 // it; the menu drives Spotify's own filter chips, hidden in the stack, and offers the device picker when Spotify
 // has one (a now playing bar) and the large shelf's Show all, its heading being gone (HomeTopPicks.x).
@@ -264,6 +266,89 @@ static void place(UIView *view, CGRect frame) {
     if (!CGPointEqualToPoint(view.center, center)) view.center = center;
 }
 
+
+#pragma mark - the pill's rim
+
+// The rainbow the Mod Settings switches wear (Settings/SGGlowSwitch.m): a conic gradient masked to the
+// capsule's outline, turning slowly round it. It is a subview of the glass, so it scrolls and fades with the
+// pill and takes no touches of its own.
+static const CGFloat kRimWidth = 1.5;
+static const CFTimeInterval kRimTurn = 8;   // seconds for the ring to go round once
+
+static NSArray *rimRainbow(void) {
+    static NSArray *colors;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSMutableArray *list = [NSMutableArray array];
+        // Starting and ending on the same pink, so the turn has no seam.
+        for (NSNumber *rgb in @[@0xFF375F, @0xFF9F0A, @0xFFD60A, @0x30D158, @0x64D2FF, @0x0A84FF, @0xBF5AF2, @0xFF375F]) {
+            uint32_t v = rgb.unsignedIntValue;
+            [list addObject:(id)[UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0 green:((v >> 8) & 0xFF) / 255.0
+                                                 blue:(v & 0xFF) / 255.0 alpha:1].CGColor];
+        }
+        colors = list;
+    });
+    return colors;
+}
+
+static UIView *rimIn(UIView *header, UIView *glass) {
+    UIView *rim = objc_getAssociatedObject(glass, &kRimKey);
+    if (rim) return rim;
+    rim = [UIView new];
+    rim.userInteractionEnabled = NO;
+    rim.backgroundColor = UIColor.clearColor;
+    CAShapeLayer *mask = [CAShapeLayer layer];
+    mask.fillColor = UIColor.clearColor.CGColor;
+    mask.strokeColor = UIColor.blackColor.CGColor;
+    mask.lineWidth = kRimWidth;
+    rim.layer.mask = mask;
+
+    CAGradientLayer *gradient = [CAGradientLayer layer];
+    gradient.type = kCAGradientLayerConic;
+    gradient.colors = rimRainbow();
+    gradient.startPoint = CGPointMake(0.5, 0.5);
+    gradient.endPoint = CGPointMake(0.5, 0);
+    [rim.layer addSublayer:gradient];
+
+    CABasicAnimation *turn = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+    turn.fromValue = @0;
+    turn.toValue = @(2 * M_PI);
+    turn.duration = kRimTurn;
+    turn.repeatCount = HUGE_VALF;
+    [gradient addAnimation:turn forKey:@"turn"];
+
+    // Beside the glass in the header, not inside it: the glass is a UIVisualEffectView on iOS 26, and a
+    // subview of one is drawn into its content, which the material rounds and can clip. The pill is pinned
+    // (followScroll), so a sibling stays on it without a transform of its own.
+    [header insertSubview:rim aboveSubview:glass];
+    objc_setAssociatedObject(glass, &kRimKey, rim, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return rim;
+}
+
+// The ring on the pill's bounds: the stroke sits on the capsule's edge, and the gradient is drawn far past
+// them, so the turn never shows a corner.
+static void paintRim(UIView *header, UIView *glass, CGRect pill) {
+    UIView *rim = rimIn(header, glass);
+    // A header Spotify rebuilt has none of ours in it, and the ring is put back rather than lost with the old one;
+    // then kept last, so the glass, the buttons and the avatar cannot draw over it.
+    if (rim.superview != header) [header insertSubview:rim aboveSubview:glass];
+    if (header.subviews.lastObject != rim) [header bringSubviewToFront:rim];
+    place(rim, CGRectInset(pill, -0.5, -0.5));
+    CGRect bounds = rim.bounds;
+    if (bounds.size.width < 2 || bounds.size.height < 2) return;
+    CAShapeLayer *mask = (CAShapeLayer *)rim.layer.mask;
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(bounds, kRimWidth / 2, kRimWidth / 2)
+                                                   cornerRadius:(bounds.size.height - kRimWidth) / 2];
+    if (!CGPathEqualToPath(mask.path, path.CGPath)) mask.path = path.CGPath;
+    CAGradientLayer *gradient = (CAGradientLayer *)rim.layer.sublayers.firstObject;
+    CGFloat side = MAX(bounds.size.width, bounds.size.height) * 2;
+    CGRect want = CGRectMake(0, 0, side, side);
+    if (!CGRectEqualToRect(gradient.bounds, want)) {
+        gradient.bounds = want;
+        gradient.position = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    }
+}
+
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     SGRHomePillButtons *buttons = buttonsIn(header);
     UIView *glass = glassIn(header);
@@ -277,6 +362,7 @@ static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
     if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
     SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
+    paintRim(header, glass, pill);
     return CGRectGetMinX(pill);
 }
 
@@ -306,20 +392,16 @@ static void rise(UIView *part, CGAffineTransform transform, CGFloat alpha) {
     if (part.alpha != alpha) part.alpha = alpha;
 }
 
-// The pill's glass takes no alpha (SGRGlass.h): it rises with the row, and its material goes off once the row is
-// half faded and comes back with it.
+// The pill's glass takes no alpha (SGRGlass.h), so its material is switched, not faded: it stays on for as long
+// as the pill is on screen, which is now always.
 static const NSTimeInterval kGlassFade = 0.15;
 static BOOL sg_glassShown = YES;
-// When the material's last change ends: until then the glass keeps rising after the row has faded.
-static CFTimeInterval sg_glassFadeEnds;
-static void riseGlass(UIView *glass, CGAffineTransform transform, CGFloat alpha) {
+static void riseGlass(UIView *glass, BOOL shown) {
     if (!glass) return;
-    if (!CGAffineTransformEqualToTransform(glass.transform, transform)) glass.transform = transform;
-    BOOL shown = alpha > 0.5;
+    if (!CGAffineTransformEqualToTransform(glass.transform, CGAffineTransformIdentity)) glass.transform = CGAffineTransformIdentity;
     UIView *shape = objc_getAssociatedObject(glass, &kPillGlassKey);
     if (!shape || shown == sg_glassShown) return;
     sg_glassShown = shown;
-    sg_glassFadeEnds = CACurrentMediaTime() + kGlassFade;
     [UIView animateWithDuration:kGlassFade animations:^{ SGRShowGlass(shape, shown); }];
 }
 
@@ -328,14 +410,16 @@ static void followScroll(UIScrollView *scroll) {
     if (!title || !scroll) return;
     CGFloat scrolled = MAX(0, scroll.contentOffset.y + scroll.adjustedContentInset.top), faded = MAX(1, title.bounds.size.height);
     CGFloat alpha = 1 - MIN(1, scrolled / faded);
-    // Past the title's height the row has faded out, so it stops rising there and nothing is written again until it
-    // comes back; the glass keeps rising while its material is still going off.
+    // The title stops rising at its own height: past that it has faded out, and nothing is written again until
+    // the page comes back.
     CGAffineTransform up = CGAffineTransformMakeTranslation(0, -MIN(scrolled, faded));
-    BOOL glassFading = CACurrentMediaTime() < sg_glassFadeEnds || (alpha > 0.5) != sg_glassShown;
+    // The title and its date scroll away; the pill does not. It keeps its place over the feed, so the filter
+    // button and the avatar stay under the thumb however far the page has been scrolled, and the rim on it
+    // stays with them.
     rise(title, up, alpha);
-    riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), glassFading ? CGAffineTransformMakeTranslation(0, -scrolled) : up, alpha);
-    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);
-    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, up, alpha);
+    riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), YES);
+    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), CGAffineTransformIdentity, 1);
+    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, CGAffineTransformIdentity, 1);
 }
 
 @interface SGRHomeTitleFollower : NSObject

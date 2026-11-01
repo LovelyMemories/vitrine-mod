@@ -11,6 +11,7 @@
 #import "Core/SGCore.h"
 #import "Headers/SPTPlayer.h"
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/Player/SGLastTrack.h"
 #import "LiveActivity.h"
 
 API_AVAILABLE(ios(17.0))
@@ -155,6 +156,7 @@ static void checkSleepTimer(id<SPTPlayer> player, SPTPlayerState *state, NSStrin
 // the card's background. The cover is the now playing artwork Spotify sets on every track, cut to 48 px and kept
 // as JPEG; both are worked out once per track, never on a tick that changes nothing else.
 static NSString *sg_coverTrack;
+static id sg_coverArtwork;          // the artwork object the cached cover was made from
 static NSData *sg_coverData;
 static NSString *sg_coverTint = @"";
 
@@ -192,25 +194,15 @@ static NSData *jpegData(UIImage *image, CGFloat quality) {
     return done ? data : nil;
 }
 
-static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
-    if (trackID && [trackID isEqualToString:sg_coverTrack]) {
-        *data = sg_coverData;
-        *tint = sg_coverTint;
-        return;
-    }
-    sg_coverData = nil;
-    sg_coverTint = @"";
-    MPNowPlayingInfoCenter *center = MPNowPlayingInfoCenter.defaultCenter;
-    id artwork = center.nowPlayingInfo[MPMediaItemPropertyArtwork];
-    UIImage *image = [artwork respondsToSelector:@selector(imageWithSize:)] ? [artwork imageWithSize:CGSizeMake(96, 96)] : nil;
-    // Not in yet: the info comes a moment after the track does, so the track is asked again on the next tick
-    // rather than being remembered with no cover.
-    if (!image.CGImage) {
-        sg_coverTrack = nil;
-        *tint = @"";
-        return;
-    }
-    sg_coverTrack = trackID;
+// The card's cover and colour for the track on now. Two sources, in this order: the artwork in the now playing
+// info, which is what the card wants and is there a moment after a track starts; and, until it is, the cover the
+// track's own metadata names, the one the settings pages show (Shared/Player/SGLastTrack.h). The second is
+// fetched, so the card is coloured on the tick after it lands rather than staying black for a song.
+//
+// The now playing artwork lags the track too: after a skip it still carries the song before, which is how a
+// card came out in the previous cover's colour. The cache is therefore keyed by the track AND the artwork
+// object, and an artwork that is not the cached one and not yet a new one means the info has not caught up.
+static void makeCover(UIImage *image, NSData **data, NSString **tint) {
     CGSize size = CGSizeMake(48, 48);
     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
     UIImage *small = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
@@ -224,6 +216,55 @@ static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
         color = [UIColor colorWithHue:hue saturation:MIN(saturation, 0.6) brightness:MIN(brightness, 0.55) alpha:1];
     }
     sg_coverTint = hexOf(color);
+    *data = sg_coverData;
+    *tint = sg_coverTint;
+}
+
+static BOOL sg_coverAsking;   // a fetch of the track's own cover is in flight
+
+static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
+    MPNowPlayingInfoCenter *center = MPNowPlayingInfoCenter.defaultCenter;
+    id artwork = center.nowPlayingInfo[MPMediaItemPropertyArtwork];
+    if ([artwork respondsToSelector:@selector(imageWithSize:)]) {
+        UIImage *image = [artwork imageWithSize:CGSizeMake(96, 96)];
+        if (image.CGImage) {
+            if (trackID && [trackID isEqualToString:sg_coverTrack] && artwork == sg_coverArtwork) {
+                *data = sg_coverData;
+                *tint = sg_coverTint;
+                return;
+            }
+            sg_coverTrack = trackID;
+            sg_coverArtwork = artwork;
+            makeCover(image, data, tint);
+            return;
+        }
+    }
+    // No artwork in the info yet: the card takes the track's own cover, and asks for it once.
+    if (trackID && [trackID isEqualToString:sg_coverTrack] && sg_coverTint.length) {
+        *data = sg_coverData;
+        *tint = sg_coverTint;
+        return;
+    }
+    if (trackID && !sg_coverAsking) {
+        sg_coverAsking = YES;
+        NSString *asked = trackID;
+        SGShownTrackArtwork(SGShownTrackNow(), ^(UIImage *image) {
+            sg_coverAsking = NO;
+            // The song moved on while the picture was coming: that one's turn will ask again.
+            if (![asked isEqualToString:SGKaraokePlayingTrack()]) return;
+            if (!image.CGImage) return;
+            sg_coverTrack = asked;
+            sg_coverArtwork = nil;
+            NSData *cover = nil;
+            NSString *arrived = @"";
+            makeCover(image, &cover, &arrived);
+            // The card has to be told: the state it holds is the one without this cover.
+            if (@available(iOS 17.0, *)) {
+                sg_shown = nil;
+                if (sg_timer) tick();
+            }
+        });
+    }
     *data = sg_coverData;
     *tint = sg_coverTint;
 }

@@ -84,8 +84,8 @@ struct SGLyricsLiveActivity: Widget {
                 CardBackground(state: context.state)
                 ContentView(state: context.state, upNext: 4)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, context.state.view == .panel ? 12 : 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, context.state.view == .panel ? 10 : 14)
+                    .padding(.vertical, 8)
             }
             .foregroundStyle(.white)
             .activityBackgroundTint(cardTint(context.state.tint).opacity(0.85))
@@ -145,24 +145,24 @@ private struct LyricsView: View {
     let state: State
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 9) {
             // The player draws the cover beside the line, small and sharp; the card does the same.
             if let image = state.coverImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .frame(width: 34, height: 34)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(state.line)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
                     .direction(of: state.line)
                 if !state.nextLine.isEmpty {
                     Text(state.nextLine)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
                         .direction(of: state.nextLine)

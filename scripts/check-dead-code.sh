@@ -13,8 +13,10 @@ cd "$SOURCES" || exit 1
 
 dead=""
 for file in $(find . -type f \( -name '*.m' -o -name '*.x' \) | sort); do
-    names=$(grep -E '^static[[:space:]].*[[:space:]*][A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' "$file" \
-            | sed -E 's/.*[[:space:]*]([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*\(.*/\1/')
+    # The name is the identifier right before the first `(`: everything up to it is the return type, which
+    # cannot hold a paren. A greedy read of the line instead would take the last call in the body, which is
+    # how this check first failed on `NS_FORMAT_FUNCTION(1, 2)` and on a one-line body.
+    names=$(sed -nE 's/^static[[:space:]]+[^()]*[[:space:]*]([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*\(.*/\1/p' "$file")
     for name in $names; do
         # Only a real identifier: the scan is textual, and a type macro or a block would otherwise be read
         # as one.

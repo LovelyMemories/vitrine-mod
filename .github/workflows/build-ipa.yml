@@ -1,0 +1,85 @@
+name: Build IPA from your own Spotify IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: "Direct link to a decrypted Spotify IPA"
+        required: true
+        type: string
+      upload_method:
+        description: "Where to put the result"
+        default: artifacts
+        type: choice
+        options: [artifacts, filebin, both]
+
+env:
+  THEOS: ${{ github.workspace }}/theos
+
+jobs:
+  build:
+    runs-on: macos-latest
+    # Without this a stuck brew or curl holds the job until GitHub's six-hour limit: ten minutes of silence and
+    # then a failure with nothing in the log says where it stopped.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # A checkout made from a Windows machine loses the executable bit, and make release starts
+      # ./scripts/pipeline.sh and the build calls the rest of scripts/ directly.
+      - name: Make the scripts executable
+        run: chmod +x scripts/*.sh scripts/*.py
+
+      - uses: levibostian/action-hide-sensitive-inputs@v1
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/checkout@v5
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+
+      # Apart, and each with a limit of its own: a brew that cannot reach its bottles is the step that hangs, and
+      # the log then says which of the two it was instead of stopping at the last line of one long step.
+      - name: Install tools (brew)
+        timeout-minutes: 20
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install make dpkg ldid
+
+      - name: Install tools (pyzule)
+        timeout-minutes: 10
+        run: python3 -m pip install --break-system-packages git+https://github.com/asdfzxcvbn/pyzule-rw.git
+
+      - name: Download IPA
+        timeout-minutes: 15
+        run: |
+          mkdir -p ipa
+          curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 900 \
+            "${{ inputs.ipa_url }}" -o ipa/spotify.ipa
+          case "$(file --mime-type -b ipa/spotify.ipa)" in application/zip|application/x-ios-app) ;; *) echo "::error::Not an IPA"; exit 1 ;; esac
+
+      - name: Build the tweak into the IPA
+        timeout-minutes: 30
+        run: make release
+
+      - uses: actions/upload-artifact@v5
+        if: inputs.upload_method != 'filebin'
+        with:
+          name: vitrine.ipa
+          path: out/*.ipa
+          if-no-files-found: error
+
+      - name: Upload to filebin.net
+        if: inputs.upload_method != 'artifacts'
+        run: |
+          BIN="vitrine-${{ github.run_id }}"
+          echo "### filebin.net download" >> "$GITHUB_STEP_SUMMARY"
+          for f in out/*.ipa; do
+            curl -fsS -X POST -H "Content-Type: application/octet-stream" --data-binary "@$f" "https://filebin.net/$BIN/$(basename "$f")" >/dev/null
+            echo "- https://filebin.net/$BIN/$(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "- _filebin deletes bins after a few days of inactivity, download promptly._" >> "$GITHUB_STEP_SUMMARY"

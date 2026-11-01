@@ -19,6 +19,8 @@ static char kZenAttachedKey;   // the recognizer, on the list
 static __weak UIView *sg_zenList;
 static BOOL sg_zen;
 static NSHashTable<UIView *> *sg_zenHidden;   // weak: a view that goes away takes its entry with it
+static NSUInteger sg_zenLastTaken;            // so a pass that takes nothing new keeps quiet: the player is
+                                              // laid out dozens of times a second and said the same line each time
 
 // The mod's own target for the recognizer: the list is Spotify's class and has no selector of ours.
 @interface SGRZenPress : NSObject <UIGestureRecognizerDelegate>
@@ -61,6 +63,8 @@ static void applyZen(void) {
     // not there yet.
     UIView *cover = list.superview ? list : (SGRPlayerCoverList() ?: list);
     prune(host, cover, (UIView *)SGRPlayerField());
+    if (sg_zenHidden.count == sg_zenLastTaken) return;
+    sg_zenLastTaken = sg_zenHidden.count;
     SGLog(@"player zen: the music alone in %@ of %lu views on, %lu taken off", NSStringFromClass(host.class),
           (unsigned long)host.subviews.count, (unsigned long)sg_zenHidden.count);
 }
@@ -77,6 +81,7 @@ static void bringBack(void) {
         objc_setAssociatedObject(view, &kZenTakenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     [sg_zenHidden removeAllObjects];
+    sg_zenLastTaken = 0;
     SGLog(@"player zen: the player back");
 }
 

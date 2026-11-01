@@ -9,7 +9,6 @@
 // EeveeSpotify's, less its Ably hooks, which it does not turn on for 9.1 either.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
-#import "Shared/Player/AutoMix.h"
 
 static BOOL ads, premium;
 static NSDate *started;
@@ -337,10 +336,7 @@ static NSURLRequest *unconditional(NSURLRequest *request) {
 %ctor {
     ads = SGHidden(SGKeyHideAds);
     premium = SGHidden(SGKeyFakePremium);
-    // AutoMix's gate is an entry of the configuration these responses carry, not an iOS flag, so its switch needs
-    // the rewrite installed too. Nothing else of the blocking is reached by it: the attributes are only touched
-    // for Hide ads and Spoof Premium (Premium.m, patchUcs).
-    if (!ads && !premium && !SGHidden(SGKeyAutoMix)) return;
+    if (!ads && !premium) return;
     started = NSDate.date;
     cacheLock = [NSObject new];
     %init;

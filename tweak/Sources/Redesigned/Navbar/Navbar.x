@@ -73,6 +73,7 @@ static UIView *iconView(NSDictionary *entry) {
 @property (nonatomic, copy) NSString *uri;
 - (instancetype)initWithEntry:(NSDictionary *)entry;
 - (void)applyEntry:(NSDictionary *)entry;
+- (void)sendURI:(NSURL *)url attempt:(NSUInteger)attempt;
 @end
 
 @implementation SGRTabItemView {
@@ -151,7 +152,31 @@ static UIView *iconView(NSDictionary *entry) {
     SGLinkRoute route = SGSpotifyURIRoute(url, &via);
     SGLog(@"navbar: open %@ -> %@", url.absoluteString ?: self.uri,
           route == SGLinkRouteOpens ? via : route == SGLinkRouteNone ? @"no handler" : @"unknown");
-    if (!SGOpenSpotifyURI(url)) SGLog(@"navbar: cannot open %@, dispatcher %@", self.uri, SGLinkDispatcher());
+    [self sendURI:url attempt:0];
+}
+
+// The link dispatcher is built with the app's main UI, a few seconds into a launch, and the glass bar is
+// tappable before that: a tap in between found no dispatcher and opened nothing (the log's "cannot open
+// ..., dispatcher (null)"). Wait for it instead, and stop if another tab is tapped meanwhile.
+static const NSUInteger kOpenTries = 12;
+static const CFTimeInterval kOpenTryGap = 0.25;
+
+- (void)sendURI:(NSURL *)url attempt:(NSUInteger)attempt {
+    if (!url) return;
+    if (sg_tappedTab != self) return;
+    if (SGOpenSpotifyURI(url)) {
+        if (attempt) SGLog(@"navbar: opened %@ after %.2f s, the dispatcher was not up yet",
+                           url.absoluteString, attempt * kOpenTryGap);
+        return;
+    }
+    if (attempt >= kOpenTries) {
+        SGLog(@"navbar: cannot open %@, dispatcher %@", self.uri, SGLinkDispatcher());
+        return;
+    }
+    __weak SGRTabItemView *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kOpenTryGap * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [weakSelf sendURI:url attempt:attempt + 1];
+    });
 }
 
 @end

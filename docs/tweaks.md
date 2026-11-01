@@ -87,14 +87,6 @@ Shared:
                   command's ESP request gets overrideRestrictions before the core receives it; other restrictions
                   and commands stay as Spotify supplied them. The hooks install together only when the expected
                   runtime signatures match. Checked by harness/radio-modes/; its README records device evidence.
-    Player/       AutoMix.m answers the player's two automix flags itself (core-automix.automix_enabled and
-                  ios-feature-settings.automix_enabled) while its switch is on, so blended transitions between songs
-                  do not wait for Spoof Premium, whose own rules switch them on too when it is (Shared/AdBlock/
-                  Premium.m). It is a flag forcer, Core/SGFlagForce.h, so it beats an override from All flags and
-                  its row there reads the value out locked; it draws no screen, so it answers under either look.
-                  AutoMix.x also pins the player's own stored switch, SPTPreferencesImplementation.audioAutomix,
-                  which is what the player reads to blend the next track and which a Free account keeps off (the
-                  crossfade one is handled the same way in Shared/AdBlock/Crossfade.x).
     AlbumQueue/   With Spoof Premium on, adds Add to Queue to an album page's header menu when Spotify leaves
                   that row out, under either look. The Creative Work page's template.creativeWork.uri is read
                   by named Swift reflection and checked against the header's menu button; a track menu is

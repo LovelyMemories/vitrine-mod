@@ -177,6 +177,14 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
         volume.alpha = 0;
         return NO;
     }
+    // The player's bottom stack is laid out after its first pass, and until then it is 0pt tall with the footer at
+    // -84, which the arithmetic below turns into a place above the buttons: the log of that pass reads "footer row
+    // from -84 to -54 of 0" and the row was drawn across the controls. No size, no row; a pass that has one asks
+    // again, and `settle` above is what gets it asked.
+    if (stack.bounds.size.height < 1) {
+        volume.alpha = 0;
+        return NO;
+    }
     CGFloat above = CGRectGetMaxY([play convertRect:play.bounds toView:stack]);
     CGFloat below = [row convertPoint:CGPointMake(CGRectGetMidX(row.bounds), CGRectGetMidY(row.bounds)) toView:stack].y - kGlyphsHalf;
     CGFloat height = kRowHeight, room = below - above;

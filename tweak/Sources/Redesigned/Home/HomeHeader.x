@@ -369,6 +369,9 @@ static void followScroll(UIScrollView *scroll) {
     riseGlass(glass, glassFading ? CGAffineTransformMakeTranslation(0, -scrolled) : up, alpha);
     rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);
     if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, up, alpha);
+    // The ring stays where it was put but goes with the row's fade, so it is gone by the time the page scrolls
+    // under it: no transform, only the alpha the title and the pill share.
+    rise(objc_getAssociatedObject(sg_header, &kRimKey), CGAffineTransformIdentity, alpha);
 }
 
 @interface SGRHomeTitleFollower : NSObject

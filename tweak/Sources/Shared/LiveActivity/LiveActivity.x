@@ -3,6 +3,8 @@
 // pause. The view is read on every tick, so picking another one shows within a tick. Spotify keeps
 // playing in the background, so the timer keeps running there too, and with it the sleep timer.
 // The activity is started only while the app is in front, the one place ActivityKit allows it.
+#import <ImageIO/ImageIO.h>
+#import <math.h>
 #import <UIKit/UIKit.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <objc/runtime.h>
@@ -167,12 +169,27 @@ static UIColor *averageColor(UIImage *image) {
     if (!image.CGImage) return nil;
     unsigned char bytes[4] = {0, 0, 0, 255};
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(bytes, 1, 1, 8, 4, space, kCGImageAlphaNoneSkipLast);
+    CGContextRef context = CGBitmapContextCreate(bytes, 1, 1, 8, 4, space, (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
     CGColorSpaceRelease(space);
     if (!context) return nil;
     CGContextDrawImage(context, CGRectMake(0, 0, 1, 1), image.CGImage);
     CGContextRelease(context);
     return [UIColor colorWithRed:bytes[0] / 255.0 green:bytes[1] / 255.0 blue:bytes[2] / 255.0 alpha:1];
+}
+
+// JPEG bytes of an image at `quality`. UIImageJPEGRepresentation would do it in one call, but it has been
+// deprecated since iOS 12 and this build treats a warning as an error.
+static NSData *jpegData(UIImage *image, CGFloat quality) {
+    if (!image.CGImage) return nil;
+    NSMutableData *data = [NSMutableData data];
+    CGImageDestinationRef destination = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)data,
+                                                                        CFSTR("public.jpeg"), 1, NULL);
+    if (!destination) return nil;
+    CGImageDestinationAddImage(destination, image.CGImage,
+        (__bridge CFDictionaryRef)@{(__bridge NSString *)kCGImageDestinationLossyCompressionQuality: @(quality)});
+    BOOL done = CGImageDestinationFinalize(destination);
+    CFRelease(destination);
+    return done ? data : nil;
 }
 
 static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
@@ -199,7 +216,7 @@ static void coverFor(NSString *trackID, NSData **data, NSString **tint) {
     UIImage *small = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
         [image drawInRect:CGRectMake(0, 0, size.width, size.height)];
     }];
-    sg_coverData = UIImageJPEGRepresentation(small, 0.4);
+    sg_coverData = jpegData(small, 0.4);
     // Held dark, the way the player holds its field: white text keeps its contrast on any cover.
     UIColor *color = averageColor(image);
     CGFloat hue = 0, saturation = 0, brightness = 0, alpha = 1;

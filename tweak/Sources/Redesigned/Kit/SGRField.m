@@ -360,9 +360,9 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (_flows || _fluid || _aurora || (!_showsBackdrop && !_showsCover)) return request;
     CGFloat width = self.bounds.size.width > 0 ? self.bounds.size.width : 402;
     if (_showsCover) {
-        // Stretched over the whole screen and asked for at half size: upscaled it comes back softer than a
-        // backdrop does, which is the blur a background wants without compositing a live one.
-        request.backdropSize = CGSizeMake(width / 2, windowHeight(self) / 2);
+        // Stretched over the whole screen and asked for at four fifths of it: enough upscaling to soften the
+        // picture, little enough that the artwork still reads as itself. No live blur is composited.
+        request.backdropSize = CGSizeMake(width * 0.8, windowHeight(self) * 0.8);
     } else {
         request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
     }

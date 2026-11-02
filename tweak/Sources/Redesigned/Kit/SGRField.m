@@ -212,6 +212,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (aurora) {
         _backdrop.hidden = YES;
         if (_colors) [_auroraLayer setColors:_colors animated:NO];
+        [self rereadPaletteAnimated:NO];
     }
     [self watch];
     [self updateMotion];
@@ -243,6 +244,9 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (showsCover) {
         _backdrop.hidden = YES;
         if (_image) _cover.contents = (__bridge id)_image.CGImage;
+        // The blurred copy is what this background is: asked for now, since the request it was read under may
+        // not have rendered one.
+        [self rereadPaletteAnimated:NO];
     }
     [self watch];
     [self updateMotion];
@@ -349,21 +353,43 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     [self applyColor:SGRFieldColorFor(color) animated:self.window != nil];
 }
 
+// What the palette is asked for, given what the field is showing now. A backdrop is rendered off the main
+// thread, so it is asked for only when one of the two backgrounds that want it is on.
+- (SGRPaletteRequest)paletteRequest {
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
+    if (_flows || _fluid || _aurora || (!_showsBackdrop && !_showsCover)) return request;
+    CGFloat width = self.bounds.size.width > 0 ? self.bounds.size.width : 402;
+    if (_showsCover) {
+        // Stretched over the whole screen and asked for at half size: upscaled it comes back softer than a
+        // backdrop does, which is the blur a background wants without compositing a live one.
+        request.backdropSize = CGSizeMake(width / 2, windowHeight(self) / 2);
+    } else {
+        request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
+    }
+    return request;
+}
+
+// The palette read again for the picture already in hand: the Player page's own card changes background
+// without a new track, and a backdrop that is now wanted was not rendered for the request it was read under.
+- (void)rereadPaletteAnimated:(BOOL)animated {
+    if (!_image) return;
+    NSUInteger generation = ++_generation;
+    SGRPaletteRequest request = [self paletteRequest];
+    __weak SGRArtworkField *weakSelf = self;
+    [SGRPalette paletteForImage:_image request:request completion:^(SGRPalette *palette) {
+        SGRArtworkField *field = weakSelf;
+        if (!field || !palette || generation != field->_generation) return;
+        [field applyPalette:palette animated:animated && field.window != nil];
+    }];
+}
+
 - (void)setArtwork:(UIImage *)image identity:(NSString *)identity animated:(BOOL)animated {
     if (!image || image == _image || (identity && [identity isEqualToString:_identity])) return;
     _image = image;
     _identity = [identity copy];
     if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
     if (_cover) _cover.contents = (__bridge id)image.CGImage;
-    NSUInteger generation = ++_generation;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
-    if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
-    __weak SGRArtworkField *weakSelf = self;
-    [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
-        SGRArtworkField *field = weakSelf;
-        if (!field || !palette || generation != field->_generation) return;
-        [field applyPalette:palette animated:animated && field.window != nil];
-    }];
+    [self rereadPaletteAnimated:animated];
 }
 
 #pragma mark - holding a page
@@ -428,6 +454,12 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         // Past the moving field's edges (the pull that dismisses the player) the color under it goes on.
         [self applyColor:_flow.baseColor animated:animated];
         return;
+    }
+    if (_showsCover && palette.backdrop) {
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _cover.contents = (__bridge id)palette.backdrop.CGImage;
+        [CATransaction commit];
     }
     if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover && palette.backdrop) {
         [CATransaction begin];

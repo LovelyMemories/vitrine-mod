@@ -1,4 +1,9 @@
-// The artwork's colors as a few soft blobs, drifting and breathing behind a page: an aurora, not a picture.
+// The artwork's colors as a few soft pools of light, with specular glints over them, drifting and breathing
+// behind a page: an aurora, not a picture.
+//
+// The shimmer is two colors to a pool whose opacities cross, so a pool changes color without anything being
+// re-rendered. The glints are small, brighter copies of the same hues on a tighter ring, which is what keeps
+// the surface from moving as one piece.
 //
 // Like SGRFlow.h it is Core Animation only -- radial gradients the render server composites and moves, with
 // nothing drawn and nothing blurred live -- so it costs the same whether the page is still or moving.

@@ -98,7 +98,7 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     field.flows = background == SGRPlayerBackgroundColours;
     // Fluid is what Animated and the Visualizer show over: they are the picture either way.
-    field.fluid = background == SGRPlayerBackgroundFluid || background >= SGRPlayerBackgroundAnimated && background <= SGRPlayerBackgroundVisualiser;
+    field.fluid = background == SGRPlayerBackgroundFluid || (background >= SGRPlayerBackgroundAnimated && background <= SGRPlayerBackgroundVisualiser);
     field.aurora = background == SGRPlayerBackgroundAurora;
     field.showsCover = background == SGRPlayerBackgroundCover;
     field.motionHeld = fieldHeld();

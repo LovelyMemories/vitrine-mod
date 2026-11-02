@@ -7,7 +7,7 @@ static const size_t kSample = 64;      // the artwork shrunk to this square befo
 static const size_t kEdgeRows = 10;    // the bottom rows of it averaged into the edge color
 static const CGFloat kMaxSaturation = 0.55;
 static const CGFloat kMaxLuminance = 0.07, kMaxLuminanceContrast = 0.04;
-static const CGFloat kBackdropWidth = 160, kBackdropMaxHeight = 400, kBackdropSigma = 12;
+static const CGFloat kBackdropWidth = 160, kBackdropMaxHeight = 400, kBackdropSigma = 7;
 static const CGFloat kDissolveWidth = 96, kDissolveSigma = 5;
 static const CGFloat kFadeFrom = 0.55, kDissolveOpaque = 0.85;
 // A tint: the artwork's dominant color, brought down to kTintLuminance, then kTintShare of it mixed into the

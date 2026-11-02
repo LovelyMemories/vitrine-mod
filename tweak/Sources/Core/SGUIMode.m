@@ -16,7 +16,7 @@ BOOL SGRedesignFellBack(void) {
     return sg_fellBack;
 }
 
-// Below iOS 26 a launch with the redesign leaves a mark that the main queue takes off once it has run
+// Below iOS 26 a launch with the mod's look leaves a mark that the main queue takes off once it has run
 // for a while, or as Spotify first leaves the front, which only a main thread that answers is told of. A
 // launch that hung (the watchdog of #37) gets to neither, so the next one finds the mark and starts
 // native. ponytail: a force quit from the switcher in the first 15 s, with Spotify still in front until
@@ -25,10 +25,10 @@ static BOOL startsUntested(void) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     if ([store boolForKey:kStarting]) {
         [store removeObjectForKey:kStarting];
-        SGSetEnabled(SGKeyRedesign, NO);
+        SGSetInt(SGKeyLook, SGUILookNative);
         SGSetEnabled(SGKeyRedesignUntested, NO);
         sg_fellBack = YES;
-        SGLog(@"ui: the last launch with the redesign on iOS %@ did not get going, so this one is native",
+        SGLog(@"ui: the last launch with a look of the mod's on iOS %@ did not get going, so this one is native",
               NSProcessInfo.processInfo.operatingSystemVersionString);
         return NO;
     }
@@ -44,24 +44,63 @@ static BOOL startsUntested(void) {
     return YES;
 }
 
-BOOL SGRedesignedUI(void) {
-    static BOOL on;
+SGUILook SGUILookStored(void) {
+    // The one switch per look is moved onto the look, once, the first time this is asked. The move writes
+    // straight to the defaults, past the read-through memo (SGPrefs.m), which is dropped after it.
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        on = SGRedesignedUIStored() && (SGRedesignAvailable() || startsUntested());
-        SGLog(@"ui: %@%@", on ? @"redesigned" : @"native", SGRedesignAvailable() ? @"" : on ? @" (untested below iOS 26)" : @" (the redesign needs iOS 26)");
+        BOOL moved = [NSUserDefaults.standardUserDefaults objectForKey:SGKeyRedesign] != nil;
+        SGMigrateKey(SGKeyRedesign, SGKeyLook);
+        if (moved) SGPrefsChanged();
     });
-    return on;
+    // A fresh install comes up in the redesign, as it did; Reset all settings (SGKeyStock), which sweeps by
+    // prefix, leaves no look stored and so comes up native.
+    NSInteger fallback = SGFlag(SGKeyStock, NO) ? SGUILookNative : SGUILookRedesigned;
+    NSInteger value = SGInt(SGKeyLook, fallback);
+    if (value < SGUILookNative || value > SGUILookFlow) value = SGUILookRedesigned;
+    SGUILook look = (SGUILook)value;
+    // Below 26 both of the mod's looks count only with the warning accepted (SGRedesignedUI's comment).
+    if (look != SGUILookNative && !SGRedesignAvailable() && !SGFlag(SGKeyRedesignUntested, NO)) look = SGUILookNative;
+    return look;
+}
+
+void SGSetUILook(SGUILook look) {
+    SGSetInt(SGKeyLook, look);
+    SGSetEnabled(SGKeyRedesignUntested, look != SGUILookNative && !SGRedesignAvailable());
+}
+
+static SGUILook sg_launch;
+static dispatch_once_t sg_launchOnce;
+
+static SGUILook launchLook(void) {
+    dispatch_once(&sg_launchOnce, ^{
+        SGUILook stored = SGUILookStored();
+        if (stored == SGUILookNative) sg_launch = SGUILookNative;
+        else if (SGRedesignAvailable() || startsUntested()) sg_launch = stored;
+        else sg_launch = SGUILookNative;
+        NSString *names[] = {@"native", @"redesigned", @"flow"};
+        SGLog(@"ui: %@%@", names[sg_launch],
+              SGRedesignAvailable() ? @"" : sg_launch == SGUILookNative ? @" (the mod's looks need iOS 26)" : @" (untested below iOS 26)");
+    });
+    return sg_launch;
+}
+
+BOOL SGRedesignedUI(void) {
+    return launchLook() != SGUILookNative;
+}
+
+BOOL SGFlowUI(void) {
+    return launchLook() == SGUILookFlow;
+}
+
+BOOL SGFlowUIStored(void) {
+    return SGUILookStored() == SGUILookFlow;
 }
 
 BOOL SGNativeUI(void) {
-    return !SGRedesignedUI();
+    return launchLook() == SGUILookNative;
 }
 
 BOOL SGRedesignedUIStored(void) {
-    // A fresh install comes up in the redesign: it is the look the mod is made for, and the tour that used to
-    // ask which one was the first thing anyone saw. An explicit choice, off included, is stored and wins. The
-    // stored switch is left alone rather than turned off: a phone updated to iOS 26 gets the redesign it was
-    // last asked for back. Below 26 it counts only with the warning accepted.
-    return SGFlag(SGKeyRedesign, YES) && (SGRedesignAvailable() || SGFlag(SGKeyRedesignUntested, NO));
+    return SGUILookStored() != SGUILookNative;
 }

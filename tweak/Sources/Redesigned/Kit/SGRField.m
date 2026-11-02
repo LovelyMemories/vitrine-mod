@@ -235,8 +235,8 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         // A dark foot to the whole of it: white text sits on this, and the artwork's own bright middle must
         // not win. The field's own black gradient is off under a cover.
         _coverShade = [CAGradientLayer layer];
-        _coverShade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0.38].CGColor,
-                               (id)[UIColor colorWithWhite:0 alpha:0.78].CGColor];
+        _coverShade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0.22].CGColor,
+                               (id)[UIColor colorWithWhite:0 alpha:0.62].CGColor];
         [_cover addSublayer:_coverShade];
     }
     _cover.hidden = !showsCover;
@@ -357,15 +357,15 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 // thread, so it is asked for only when one of the two backgrounds that want it is on.
 - (SGRPaletteRequest)paletteRequest {
     SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
-    if (_flows || _fluid || _aurora || (!_showsBackdrop && !_showsCover)) return request;
+    if (_flows || _fluid || _aurora) return request;
     CGFloat width = self.bounds.size.width > 0 ? self.bounds.size.width : 402;
     if (_showsCover) {
-        // Stretched over the whole screen and asked for at four fifths of it: enough upscaling to soften the
-        // picture, little enough that the artwork still reads as itself. No live blur is composited.
-        request.backdropSize = CGSizeMake(width * 0.8, windowHeight(self) * 0.8);
-    } else {
-        request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
+        // Its own render. A backdrop is a strip that is dimmed and fades out at its top, which is what the top
+        // of a page wants and what a whole screen of it is not: full screen it reads as almost black.
+        request.coverSize = CGSizeMake(width, windowHeight(self));
+        return request;
     }
+    if (_showsBackdrop) request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
     return request;
 }
 
@@ -455,10 +455,10 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         [self applyColor:_flow.baseColor animated:animated];
         return;
     }
-    if (_showsCover && palette.backdrop) {
+    if (_showsCover && palette.cover) {
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
-        _cover.contents = (__bridge id)palette.backdrop.CGImage;
+        _cover.contents = (__bridge id)palette.cover.CGImage;
         [CATransaction commit];
     }
     if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover && palette.backdrop) {

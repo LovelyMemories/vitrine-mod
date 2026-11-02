@@ -71,10 +71,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     SGRFlowLayer *_flow;
     SGRFluidLayer *_fluidLayer;
     SGRauroraLayer *_auroraLayer;
-    CALayer *_cover;
-    UIVisualEffectView *_coverGlass;
-    UIView *_coverShadeView;
-    CAGradientLayer *_coverShade;
     BOOL _watching;
     NSArray<UIColor *> *_colors;   // the artwork's flow colors, for the aurora
     UIColor *_color;
@@ -146,10 +142,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     // The screen's part of it, so the copies turn about it and the shade ends at the screen's foot.
     _fluidLayer.visibleRect = CGRectMake(bleed.left, bleed.top, bounds.size.width, height);
     _auroraLayer.frame = painted;
-    _cover.frame = painted;
-    _coverGlass.frame = painted;
-    _coverShadeView.frame = painted;
-    _coverShade.frame = _coverShadeView.bounds;
     [CATransaction commit];
 }
 
@@ -161,7 +153,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (fluid) {
         self.flows = NO;
         self.aurora = NO;
-        self.showsCover = NO;
     }
     if (fluid && !_fluidLayer) {
         _fluidLayer = [SGRFluidLayer layer];
@@ -169,7 +160,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     }
     // The fluid field is the whole picture, as the moving one is.
     _fluidLayer.hidden = !fluid || _covered;
-    _black.hidden = fluid || _flows || _aurora || _showsCover;
+    _black.hidden = fluid || _flows || _aurora;
     if (fluid) _backdrop.hidden = YES;
     if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
     [self watch];
@@ -183,7 +174,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (flows) {
         self.fluid = NO;
         self.aurora = NO;
-        self.showsCover = NO;
     }
     if (flows && !_flow) {
         _flow = [SGRFlowLayer layer];
@@ -191,7 +181,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         [self.layer insertSublayer:_flow above:_solid];
     }
     // The moving field is the whole picture: no still backdrop over it, no fade to black under it.
-    _black.hidden = flows || _fluid || _aurora || _showsCover;
+    _black.hidden = flows || _fluid || _aurora;
     if (flows) _backdrop.hidden = YES;
     else _flow.hidden = YES;
     [self watch];
@@ -205,14 +195,13 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     if (aurora) {
         self.flows = NO;
         self.fluid = NO;
-        self.showsCover = NO;
     }
     if (aurora && !_auroraLayer) {
         _auroraLayer = [SGRauroraLayer layer];
         [self.layer insertSublayer:_auroraLayer above:_solid];
     }
     _auroraLayer.hidden = !aurora;
-    _black.hidden = aurora || _flows || _fluid || _showsCover;
+    _black.hidden = aurora || _flows || _fluid;
     if (aurora) {
         _backdrop.hidden = YES;
         if (_colors) [_auroraLayer setColors:_colors animated:NO];
@@ -221,73 +210,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     [self watch];
     [self updateMotion];
     [self setNeedsLayout];
-}
-
-- (void)setShowsCover:(BOOL)showsCover {
-    if (showsCover == _showsCover) return;
-    _showsCover = showsCover;
-    if (showsCover) {
-        self.flows = NO;
-        self.fluid = NO;
-        self.aurora = NO;
-    }
-    if (showsCover && !_cover) {
-        _cover = [CALayer layer];
-        _cover.contentsGravity = kCAGravityResizeAspectFill;
-        _cover.masksToBounds = YES;
-        [self.layer insertSublayer:_cover above:_solid];
-
-        // Glass: the system's own material over the artwork, so the picture is frosted rather than merely
-        // dimmed. It is the one live blur in the kit, and it is one screen wide and only under this background.
-        _coverGlass = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
-        _coverGlass.userInteractionEnabled = NO;
-        [self addSubview:_coverGlass];
-
-        // Over the glass, not under it: light along the top edge, where a pane catches it, and the shade the
-        // title and controls need along the foot.
-        _coverShadeView = [UIView new];
-        _coverShadeView.userInteractionEnabled = NO;
-        _coverShade = [CAGradientLayer layer];
-        _coverShade.colors = @[(id)[UIColor colorWithWhite:1 alpha:0.10].CGColor,
-                               (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
-                               (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
-                               (id)[UIColor colorWithWhite:0 alpha:0.62].CGColor];
-        _coverShade.locations = @[@0, @0.28, @0.55, @1];
-        [_coverShadeView.layer addSublayer:_coverShade];
-        [self addSubview:_coverShadeView];
-    }
-    _cover.hidden = !showsCover;
-    _coverGlass.hidden = !showsCover;
-    _coverShadeView.hidden = !showsCover;
-    _black.hidden = showsCover || _flows || _fluid || _aurora;
-    if (showsCover) {
-        _backdrop.hidden = YES;
-        if (_image) _cover.contents = (__bridge id)_image.CGImage;
-        // The blurred copy is what this background is: asked for now, since the request it was read under may
-        // not have rendered one.
-        [self rereadPaletteAnimated:NO];
-    }
-    [self watch];
-    [self updateMotion];
-    [self setNeedsLayout];
-}
-
-// The cover drifts as the others move: a slow zoom in and back, so a still page is never quite still.
-- (void)coverMoving:(BOOL)moving {
-    if (!_cover) return;
-    if (!moving) {
-        [_cover removeAnimationForKey:@"cover.zoom"];
-        return;
-    }
-    if ([_cover animationForKey:@"cover.zoom"]) return;
-    CABasicAnimation *zoom = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
-    zoom.fromValue = @(1.0);
-    zoom.toValue = @(1.08);
-    zoom.duration = 48;
-    zoom.autoreverses = YES;
-    zoom.repeatCount = HUGE_VALF;
-    zoom.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-    [_cover addAnimation:zoom forKey:@"cover.zoom"];
 }
 
 - (void)setMotionHeld:(BOOL)held {
@@ -306,7 +228,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 }
 
 - (void)watch {
-    if (_watching || (!_flows && !_fluid && !_aurora && !_showsCover)) return;
+    if (_watching || (!_flows && !_fluid && !_aurora)) return;
     _watching = YES;
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, UIApplicationWillResignActiveNotification,
@@ -326,14 +248,13 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 }
 
 - (void)updateMotion {
-    if (!_flow && !_fluidLayer && !_auroraLayer && !_cover) return;
+    if (!_flow && !_fluidLayer && !_auroraLayer) return;
     // A locked phone keeps the player in its window, so being in front counts as much as being in one.
     BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
     BOOL may = self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion()
             && !NSProcessInfo.processInfo.lowPowerModeEnabled && !_motionHeld;
     _fluidLayer.moving = may && _fluid;
     _auroraLayer.moving = may && _aurora && !_auroraLayer.hidden;
-    [self coverMoving:may && _showsCover];
     BOOL moving = may && _flows && !_flow.hidden;
     if (!_flow || moving == _flow.moving) return;
     _flow.moving = moving;
@@ -377,7 +298,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 - (SGRPaletteRequest)paletteRequest {
     SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
     // The cover background is the artwork itself, unblurred, so it wants no bitmap rendered for it.
-    if (_flows || _fluid || _aurora || _showsCover || !_showsBackdrop) return request;
+    if (_flows || _fluid || _aurora || !_showsBackdrop) return request;
     CGFloat width = self.bounds.size.width > 0 ? self.bounds.size.width : 402;
     request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
     return request;
@@ -402,7 +323,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     _image = image;
     _identity = [identity copy];
     if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
-    if (_cover) _cover.contents = (__bridge id)image.CGImage;
     [self rereadPaletteAnimated:animated];
 }
 
@@ -469,7 +389,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         [self applyColor:_flow.baseColor animated:animated];
         return;
     }
-    if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover && palette.backdrop) {
+    if (_showsBackdrop && !_flows && !_fluid && !_aurora && palette.backdrop) {
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         if (animated) {

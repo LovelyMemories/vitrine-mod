@@ -32,10 +32,6 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 // Aurora (SGRAurora.h): the artwork's colors as a few soft blobs drifting over the whole of the bounds,
 // under the same conditions for moving as `flows`.
 @property (nonatomic) BOOL aurora;
-// The cover itself, full bleed and darkened, drifting slowly in and out: the artwork as a background rather
-// than as a picture. No fade to black under it, as with the other two. Setting any one of the three turns the
-// other two off.
-@property (nonatomic) BOOL showsCover;
 // Held still by the owner (the player while playback is paused, or while an Animated artwork clip covers
 // the field).
 @property (nonatomic) BOOL motionHeld;

@@ -46,7 +46,6 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualizer.",
         @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
         @"The cover's colors as a few soft blobs, drifting and breathing. It rests while a song is paused.",
-        @"The cover itself, edge to edge and darkened, drifting in and out. It rests while a song is paused.",
     ];
 }
 
@@ -196,7 +195,6 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_field.flows = kind == SGRPlayerBackgroundColours;
         self->_field.fluid = kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser;
         self->_field.aurora = kind == SGRPlayerBackgroundAurora;
-        self->_field.showsCover = kind == SGRPlayerBackgroundCover;
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];

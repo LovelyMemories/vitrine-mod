@@ -357,15 +357,10 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 // thread, so it is asked for only when one of the two backgrounds that want it is on.
 - (SGRPaletteRequest)paletteRequest {
     SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
-    if (_flows || _fluid || _aurora) return request;
+    // The cover background is the artwork itself, unblurred, so it wants no bitmap rendered for it.
+    if (_flows || _fluid || _aurora || _showsCover || !_showsBackdrop) return request;
     CGFloat width = self.bounds.size.width > 0 ? self.bounds.size.width : 402;
-    if (_showsCover) {
-        // Its own render. A backdrop is a strip that is dimmed and fades out at its top, which is what the top
-        // of a page wants and what a whole screen of it is not: full screen it reads as almost black.
-        request.coverSize = CGSizeMake(width, windowHeight(self));
-        return request;
-    }
-    if (_showsBackdrop) request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
+    request.backdropSize = CGSizeMake(width, [self backdropHeightNow]);
     return request;
 }
 
@@ -454,12 +449,6 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         // Past the moving field's edges (the pull that dismisses the player) the color under it goes on.
         [self applyColor:_flow.baseColor animated:animated];
         return;
-    }
-    if (_showsCover && palette.cover) {
-        [CATransaction begin];
-        [CATransaction setDisableActions:YES];
-        _cover.contents = (__bridge id)palette.cover.CGImage;
-        [CATransaction commit];
     }
     if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover && palette.backdrop) {
         [CATransaction begin];

@@ -45,13 +45,12 @@
   /* ---------- Cover ---------- */
   #cover { background: var(--black); }
   #cover .art {
-    position: absolute; inset: -10%;
+    position: absolute; inset: 0;
     background:
       radial-gradient(circle at 30% 22%, hsl(322 92% 66%) 0%, transparent 52%),
       radial-gradient(circle at 78% 32%, hsl(196 92% 62%) 0%, transparent 48%),
       radial-gradient(circle at 52% 86%, hsl(272 92% 58%) 0%, transparent 58%),
       linear-gradient(158deg, #17131f, #05040a);
-    filter: blur(40px) saturate(1.25) brightness(1.05);
     animation: zoom 48s ease-in-out infinite alternate;
   }
   @keyframes zoom { from { transform: scale(1.0) } to { transform: scale(1.08) } }
@@ -198,6 +197,12 @@
     <li>У каждой <b>два цвета</b> из палитры, прозрачности в противофазе — оттенок течёт на месте, 9 + i·1.4 с</li>
     <li>Качание <b>13 + i·2.7 с</b>, амплитуда ±5.5% ширины — дышит, а не едет</li>
     <li><b>Горизонт</b>: свет копится у нижней кромки, как у настоящего сияния</li>
+  </ul>
+
+  <h3>Как устроен Cover</h3>
+  <ul>
+    <li>Сама обложка на весь экран — <b>без блюра</b></li>
+    <li>Затемнение 0.22 → 0.62, зум 1.00 → 1.08 за 48 с</li>
   </ul>
 
   <h3>Чего нельзя</h3>

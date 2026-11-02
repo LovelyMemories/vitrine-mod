@@ -26,10 +26,6 @@ typedef struct {
     // edge: for a page, whose cover dissolves into the field across its whole width, where the bottom edge
     // is a scanned cover's pale border or whatever strip happens to sit at the foot of the picture.
     BOOL mainColor;
-    // The area a cover background covers, in points; CGSizeZero when none is wanted. The bitmap is the artwork
-    // filling that area, blurred hard and undimmed: a full screen of the backdrop above would be a dark strip
-    // that fades out at its top, which is what a strip is for and what a background is not.
-    CGSize coverSize;
 } SGRPaletteRequest;
 
 @interface SGRPalette : NSObject
@@ -37,7 +33,6 @@ typedef struct {
 @property (nonatomic, readonly) UIColor *fieldColor;
 @property (nonatomic, readonly) UIImage *backdrop;   // nil unless asked for, at most 160px wide
 @property (nonatomic, readonly) UIImage *dissolve;   // nil unless asked for, 96px wide
-@property (nonatomic, readonly) UIImage *cover;      // nil unless asked for, 220px wide, blurred hard
 // nil unless asked for: top left, top right, bottom left, bottom right, then the whole artwork's, each
 // the dominant color there, its saturation lifted a little and its luminance held between
 // kFlowLuminanceMin and kFlowLuminanceMax, so white text keeps better than 5.5:1 on any of them.

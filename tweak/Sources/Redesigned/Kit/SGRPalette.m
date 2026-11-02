@@ -9,9 +9,6 @@ static const CGFloat kMaxSaturation = 0.55;
 static const CGFloat kMaxLuminance = 0.07, kMaxLuminanceContrast = 0.04;
 static const CGFloat kBackdropWidth = 160, kBackdropMaxHeight = 400, kBackdropSigma = 12;
 static const CGFloat kDissolveWidth = 96, kDissolveSigma = 5;
-// A cover background: enough pixels to hold the artwork's shape, blurred far enough to be glass rather than a
-// picture, and never dimmed -- the field's own shade over it is the only darkening it gets.
-static const CGFloat kCoverWidth = 220, kCoverSigma = 26;
 static const CGFloat kFadeFrom = 0.55, kDissolveOpaque = 0.85;
 // A tint: the artwork's dominant color, brought down to kTintLuminance, then kTintShare of it mixed into the
 // surface it tints. The reference's card and tile surfaces sit at a luminance of 0.03 to 0.04 with the cover's
@@ -28,7 +25,6 @@ static const CGFloat kFlowSaturationLift = 1.25, kFlowSaturationMax = 0.9, kFlow
 @property (nonatomic, readwrite) UIColor *fieldColor;
 @property (nonatomic, readwrite) UIImage *backdrop;
 @property (nonatomic, readwrite) UIImage *dissolve;
-@property (nonatomic, readwrite) UIImage *cover;
 @property (nonatomic, readwrite) NSArray<UIColor *> *flowColors;
 @end
 
@@ -348,14 +344,6 @@ static NSString *paletteSignature(SGRPaletteRequest request) {
                 size_t width = (size_t)kBackdropWidth, height = (size_t)MIN(kBackdropMaxHeight, round(kBackdropWidth * area.height / area.width));
                 CGImageRef blurred = newBlurred(cg, width, MAX(height, 1), kBackdropSigma);
                 if (blurred) palette.backdrop = finished(blurred, YES, request.amoled ? 0.55 : 0.45, kFadeFrom, 1, 1, 0);
-                CGImageRelease(blurred);
-            }
-            CGSize cover = request.coverSize;
-            if (cover.width > 0 && cover.height > 0) {
-                size_t width = (size_t)kCoverWidth;
-                size_t height = (size_t)MAX(1, round(kCoverWidth * cover.height / cover.width));
-                CGImageRef blurred = newBlurred(cg, width, height, kCoverSigma);
-                if (blurred) palette.cover = [UIImage imageWithCGImage:blurred scale:1 orientation:UIImageOrientationUp];
                 CGImageRelease(blurred);
             }
             if (request.flow) palette.flowColors = flowColorsOf(cg, flowCeiling);

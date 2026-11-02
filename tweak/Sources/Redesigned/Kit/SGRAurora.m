@@ -167,14 +167,14 @@ static UIColor *lightOf(UIColor *color) {
         CABasicAnimation *drift = [CABasicAnimation animationWithKeyPath:@"position.x"];
         drift.fromValue = @(curtain.position.x);
         drift.toValue = @(curtain.position.x + sway);
-        drift.duration = 13 + i * 2.7;
+        drift.duration = 7 + i * 1.5;
         drift.autoreverses = YES;
         drift.repeatCount = HUGE_VALF;
         drift.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
         [curtain addAnimation:drift forKey:@"aurora.sway"];
 
         // The two colors cross while the light stands still: the hue drifts through the cover's palette.
-        CFTimeInterval turn = 9 + i * 1.4;
+        CFTimeInterval turn = 5 + i * 0.9;
         [self fade:pair[0] from:0.9 to:0.25 duration:turn offset:0 key:@"aurora.hue"];
         [self fade:pair[1] from:0.25 to:0.9 duration:turn offset:turn key:@"aurora.hue"];
     }

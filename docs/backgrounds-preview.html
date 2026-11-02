@@ -197,8 +197,8 @@
   <ul>
     <li><b>Чёрная основа</b> — иначе свет ложится на цветной туман и пропадает глубина</li>
     <li><b>6 занавесей</b>: яркие у нижнего края, гаснут кверху, бока размыты маской</li>
-    <li>У каждой <b>два цвета</b> из палитры, прозрачности в противофазе — оттенок течёт на месте, 9 + i·1.4 с</li>
-    <li>Качание <b>13 + i·2.7 с</b>, амплитуда ±5.5% ширины — дышит, а не едет</li>
+    <li>У каждой <b>два цвета</b> из палитры, прозрачности в противофазе — оттенок течёт на месте, 5 + i·0.9 с</li>
+    <li>Качание <b>7 + i·1.5 с</b>, амплитуда ±5.5% ширины — дышит, а не едет</li>
     <li><b>Горизонт</b>: свет копится у нижней кромки, как у настоящего сияния</li>
   </ul>
 
@@ -233,7 +233,7 @@
   function build() {
     curtains.innerHTML = '';
     pairs.length = 0;
-    const width = W * 0.44, height = H * 1.3, turn = (i) => 9 + i * 1.4;
+    const width = W * 0.44, height = H * 1.3, turn = (i) => 5 + i * 0.9;
 
     for (let i = 0; i < CURTAINS; i++) {
       const x = W * (-0.08 + 0.235 * i);
@@ -247,7 +247,7 @@
       curtain.style.marginLeft = (-width / 2) + 'px';
       curtain.style.marginTop = (-height / 2) + 'px';
       curtain.style.setProperty('--sway', (W * 0.055 * (i % 2 ? -1 : 1)) + 'px');
-      curtain.style.animation = `sway ${13 + i * 2.7}s ease-in-out infinite alternate`;
+      curtain.style.animation = `sway ${7 + i * 1.5}s ease-in-out infinite alternate`;
 
       const first = document.createElement('b');
       const second = document.createElement('b');

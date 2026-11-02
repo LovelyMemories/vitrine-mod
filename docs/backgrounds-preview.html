@@ -21,32 +21,26 @@
   }
   .screen { position: absolute; inset: 0; overflow: hidden; background: var(--black); }
 
-  /* ---------- Aurora ---------- */
+  /* ---------- Aurora: занавеси света на чёрном ---------- */
   .field { position: absolute; inset: 0; opacity: 0; transition: opacity .5s ease; }
   .field.on { opacity: 1; }
-  #aurora { background: var(--black); overflow: hidden; }
+  #aurora { background: #000; overflow: hidden; }
 
-  .pool { position: absolute; will-change: transform; }
-  .pool i {
-    position: absolute; inset: 0; border-radius: 50%; display: block;
-    will-change: opacity;
+  #aurora .horizon {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    opacity: .45;
   }
 
-  @keyframes glide { from { transform: translate(0, 0) } to { transform: translate(var(--dx), var(--dy)) } }
-  @keyframes turn { from { opacity: .9 } to { opacity: .15 } }
+  .curtain {
+    position: absolute; will-change: transform; z-index: 1;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 50%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, #000 50%, transparent 100%);
+  }
+  .curtain b { position: absolute; inset: 0; display: block; will-change: opacity; }
 
-  .sweep-wrap { position: absolute; inset: -30%; transform: rotate(-20deg); overflow: hidden; }
-  .sweep {
-    position: absolute; top: 0; bottom: 0; width: 55%;
-    background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,.16) 42%,
-                                         rgba(255,255,255,.16) 58%, rgba(255,255,255,0) 100%);
-    animation: cross 44s ease-in-out infinite;
-  }
-  @keyframes cross {
-    0%   { left: -60% }
-    50%  { left: 105% }
-    100% { left: -60% }
-  }
+  @keyframes sway { from { transform: translateX(0) } to { transform: translateX(var(--sway)) } }
+  @keyframes hueA { from { opacity: .9 } to { opacity: .25 } }
+  @keyframes hueB { from { opacity: .25 } to { opacity: .9 } }
 
   /* ---------- Cover ---------- */
   #cover { background: var(--black); }
@@ -57,7 +51,7 @@
       radial-gradient(circle at 78% 32%, hsl(196 92% 62%) 0%, transparent 48%),
       radial-gradient(circle at 52% 86%, hsl(272 92% 58%) 0%, transparent 58%),
       linear-gradient(158deg, #17131f, #05040a);
-    filter: blur(18px) saturate(1.1);
+    filter: blur(16px) saturate(1.1);
     animation: zoom 48s ease-in-out infinite alternate;
   }
   @keyframes zoom { from { transform: scale(1.0) } to { transform: scale(1.08) } }
@@ -152,7 +146,10 @@
 
 <div class="phone" id="phone" data-mode="aurora">
   <div class="screen">
-    <div class="field on" id="aurora"><div class="sweep-wrap"><div class="sweep"></div></div></div>
+    <div class="field on" id="aurora">
+      <div class="horizon" id="horizon"></div>
+      <div id="curtains"></div>
+    </div>
     <div class="field" id="cover"><div class="art"></div><div class="shade"></div></div>
 
     <div class="chrome">
@@ -194,24 +191,18 @@
 
   <div class="swatches" id="swatches"></div>
 
-  <h3>Что так же, как в твике</h3>
+  <h3>Как устроена Aurora</h3>
   <ul>
-    <li><b>7 пулов</b>, каждый в <b>1.25–1.91</b> ширины экрана — они перекрываются, кругов не видно</li>
-    <li>У пула <b>3 цвета</b>, прозрачности сдвинуты на треть цикла: цвет течёт A → B → C → A</li>
-    <li>Цикл <b>11 + i·1.6 с</b>, дрейф <b>34 + i·7 с</b></li>
-    <li><b>Световая полоса</b> под −20°, проходит экран за <b>44 с</b> и возвращается</li>
-    <li><b>Cover:</b> размытие мягче (0.8 экрана), затемнение 0.32 → 0.72, зум 1.00 → 1.08 за 48 с</li>
+    <li><b>Чёрная основа</b> — иначе свет ложится на цветной туман и пропадает глубина</li>
+    <li><b>6 занавесей</b>: яркие у нижнего края, гаснут кверху, бока размыты маской</li>
+    <li>У каждой <b>два цвета</b> из палитры, прозрачности в противофазе — оттенок течёт на месте, 9 + i·1.4 с</li>
+    <li>Качание <b>13 + i·2.7 с</b>, амплитуда ±5.5% ширины — дышит, а не едет</li>
+    <li><b>Горизонт</b>: свет копится у нижней кромки, как у настоящего сияния</li>
   </ul>
 
   <h3>Чего нельзя</h3>
   <ul>
-    <li class="warn"><b>«В бит» не получится.</b> Бит берётся из аудио-тапа, а в этой сборке Spotify он недоступен (<code>AudioOutputUnitStart</code> не импортируется). Всё движение — по своим таймерам, не по песне. Когда тап появится, фазу можно будет подтягивать к удару.</li>
-  </ul>
-
-  <h3>Что в браузере иначе</h3>
-  <ul>
-    <li>Здесь блюр живой (<code>filter: blur</code>), в твике он вшит в изображение заранее</li>
-    <li>В твике всё на Core Animation: ни рисования, ни пересчёта пикселей</li>
+    <li class="warn"><b>«В бит» не получится.</b> Бит берётся из аудио-тапа, а в этой сборке Spotify он недоступен (<code>AudioOutputUnitStart</code>). Всё движение — по своим таймерам.</li>
   </ul>
 </aside>
 
@@ -223,60 +214,58 @@
   ];
 
   const W = 390, H = 844;
-  const POOLS = 7;
-  const COLORS_PER_POOL = 3;
+  const CURTAINS = 6;
 
-  const aurora = document.getElementById('aurora');
   const phone = document.getElementById('phone');
-  const pools = [];
+  const curtains = document.getElementById('curtains');
+  const horizon = document.getElementById('horizon');
+  const pairs = [];
 
   function build() {
-    const sweepWrap = aurora.querySelector('.sweep-wrap');
-    pools.length = 0;
-    for (let i = 0; i < POOLS; i++) {
-      const phase = i / POOLS * Math.PI * 2 + 0.4;
-      const radius = W * (0.24 + 0.05 * (i % 3));
-      const x = W / 2 + Math.cos(phase) * radius * 1.15;
-      const y = H / 2 + Math.sin(phase) * radius * 1.5;
-      const side = W * (1.25 + 0.22 * (i % 4));
+    curtains.innerHTML = '';
+    pairs.length = 0;
+    const width = W * 0.44, height = H * 1.3, turn = (i) => 9 + i * 1.4;
 
-      const pool = document.createElement('div');
-      pool.className = 'pool';
-      pool.style.left = x + 'px';
-      pool.style.top = y + 'px';
-      pool.style.width = pool.style.height = side + 'px';
-      pool.style.marginLeft = (-side / 2) + 'px';
-      pool.style.marginTop = (-side / 2) + 'px';
-      pool.style.setProperty('--dx', (W - 2 * x) + 'px');
-      pool.style.setProperty('--dy', (H - 2 * y) + 'px');
-      pool.style.animation = `glide ${34 + i * 7}s ease-in-out infinite alternate`;
+    for (let i = 0; i < CURTAINS; i++) {
+      const x = W * (-0.08 + 0.235 * i);
 
-      const layers = [];
-      const period = 11 + i * 1.6;
-      for (let k = 0; k < COLORS_PER_POOL; k++) {
-        const blob = document.createElement('i');
-        blob.style.animation = `turn ${period}s ease-in-out infinite alternate`;
-        blob.style.animationDelay = `${-(k * period * 2 / COLORS_PER_POOL)}s`;
-        pool.appendChild(blob);
-        layers.push(blob);
-      }
-      aurora.insertBefore(pool, sweepWrap);
-      pools.push(layers);
+      const curtain = document.createElement('div');
+      curtain.className = 'curtain';
+      curtain.style.width = width + 'px';
+      curtain.style.height = height + 'px';
+      curtain.style.left = x + 'px';
+      curtain.style.top = (H * 0.56) + 'px';
+      curtain.style.marginLeft = (-width / 2) + 'px';
+      curtain.style.marginTop = (-height / 2) + 'px';
+      curtain.style.setProperty('--sway', (W * 0.055 * (i % 2 ? -1 : 1)) + 'px');
+      curtain.style.animation = `sway ${13 + i * 2.7}s ease-in-out infinite alternate`;
+
+      const first = document.createElement('b');
+      const second = document.createElement('b');
+      first.style.animation = `hueA ${turn(i)}s ease-in-out infinite alternate`;
+      second.style.animation = `hueB ${turn(i)}s ease-in-out infinite alternate`;
+      second.style.animationDelay = `${-turn(i)}s`;
+
+      curtain.append(first, second);
+      curtains.appendChild(curtain);
+      pairs.push([first, second]);
     }
     paint(PALETTES[0]);
   }
 
-  function radial(hex, alpha) {
+  function curtainGradient(hex, alpha) {
     const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
-    return `radial-gradient(circle at 50% 50%, ${hex}${a} 0%, ${hex}59 55%, ${hex}00 100%)`;
+    const b = Math.round(alpha * 0.47 * 255).toString(16).padStart(2, '0');
+    return `linear-gradient(to top, ${hex}${a} 0%, ${hex}${b} 35%, ${hex}00 100%)`;
   }
 
   function paint(colors) {
-    pools.forEach((layers, i) => {
-      layers.forEach((blob, k) => {
-        blob.style.background = radial(colors[(i + k * 2) % colors.length], 0.85);
-      });
+    pairs.forEach((pair, i) => {
+      pair[0].style.background = curtainGradient(colors[i % colors.length], 0.95);
+      pair[1].style.background = curtainGradient(colors[(i + 4) % colors.length], 0.95);
     });
+    const foot = colors[0];
+    horizon.style.background = `linear-gradient(to top, ${foot}73 0%, ${foot}00 100%)`;
   }
 
   const swatches = document.getElementById('swatches');

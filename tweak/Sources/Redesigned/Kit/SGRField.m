@@ -72,6 +72,8 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     SGRFluidLayer *_fluidLayer;
     SGRauroraLayer *_auroraLayer;
     CALayer *_cover;
+    UIVisualEffectView *_coverGlass;
+    UIView *_coverShadeView;
     CAGradientLayer *_coverShade;
     BOOL _watching;
     NSArray<UIColor *> *_colors;   // the artwork's flow colors, for the aurora
@@ -145,7 +147,9 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     _fluidLayer.visibleRect = CGRectMake(bleed.left, bleed.top, bounds.size.width, height);
     _auroraLayer.frame = painted;
     _cover.frame = painted;
-    _coverShade.frame = _cover.bounds;
+    _coverGlass.frame = painted;
+    _coverShadeView.frame = painted;
+    _coverShade.frame = _coverShadeView.bounds;
     [CATransaction commit];
 }
 
@@ -232,14 +236,29 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         _cover.contentsGravity = kCAGravityResizeAspectFill;
         _cover.masksToBounds = YES;
         [self.layer insertSublayer:_cover above:_solid];
-        // A dark foot to the whole of it: white text sits on this, and the artwork's own bright middle must
-        // not win. The field's own black gradient is off under a cover.
+
+        // Glass: the system's own material over the artwork, so the picture is frosted rather than merely
+        // dimmed. It is the one live blur in the kit, and it is one screen wide and only under this background.
+        _coverGlass = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
+        _coverGlass.userInteractionEnabled = NO;
+        [self addSubview:_coverGlass];
+
+        // Over the glass, not under it: light along the top edge, where a pane catches it, and the shade the
+        // title and controls need along the foot.
+        _coverShadeView = [UIView new];
+        _coverShadeView.userInteractionEnabled = NO;
         _coverShade = [CAGradientLayer layer];
-        _coverShade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0.22].CGColor,
+        _coverShade.colors = @[(id)[UIColor colorWithWhite:1 alpha:0.10].CGColor,
+                               (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
+                               (id)[UIColor colorWithWhite:0 alpha:0].CGColor,
                                (id)[UIColor colorWithWhite:0 alpha:0.62].CGColor];
-        [_cover addSublayer:_coverShade];
+        _coverShade.locations = @[@0, @0.28, @0.55, @1];
+        [_coverShadeView.layer addSublayer:_coverShade];
+        [self addSubview:_coverShadeView];
     }
     _cover.hidden = !showsCover;
+    _coverGlass.hidden = !showsCover;
+    _coverShadeView.hidden = !showsCover;
     _black.hidden = showsCover || _flows || _fluid || _aurora;
     if (showsCover) {
         _backdrop.hidden = YES;

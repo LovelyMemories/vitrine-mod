@@ -19,3 +19,5 @@ void SGRPlayerSetCoverHidden(BOOL hidden);
 // The playing track's artwork as the mod last read it, in `trackURI` and `identity` if given; nil until it
 // has one. Defined by Redesigned/Kit/SGRBridges.x and declared here so Flow can draw the cover itself.
 UIImage *SGRNowPlayingArtwork(NSString **trackURI, NSString **identity);
+// Posted on the main queue when that artwork changes (a new track, or the same one's picture arrived).
+extern NSNotificationName const SGRNowPlayingArtworkDidChangeNotification;

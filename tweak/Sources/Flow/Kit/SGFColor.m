@@ -5,21 +5,38 @@
 // Flow's own accent, 0xRRGGBB, unset by default; the redesign's is its own key and its own color.
 static NSString *const kFlowAccentKey = @"spotifyglass.flow.accent";
 
-// The artwork averaged to one pixel: the cover's color as the eye gets it from across the room, which is
-// what a wash should be. A cover with a white wall behind a pink subject reads gray here, and the glow
-// then takes the accent -- the same case Follow the cover handles in the redesign.
-static UIColor *averageColor(UIImage *image) {
+// The cover's color as the eye picks it: the most saturated of a grid of samples, not the average. An
+// average turns a bright sky, a white wall or a glow into gray, which is exactly what an artwork's best
+// color is not; the grid finds the one patch that is a color at all.
+static UIColor *dominantColor(UIImage *image) {
     CGImageRef cg = image.CGImage;
     if (!cg) return nil;
-    unsigned char pixel[4] = {0};
+    enum { kSide = 16 };
+    unsigned char pixels[kSide * kSide * 4] = {0};
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(pixel, 1, 1, 8, 4, space, kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGContextRef context = CGBitmapContextCreate(pixels, kSide, kSide, 8, kSide * 4, space,
+                                                 kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(space);
     if (!context) return nil;
-    CGContextSetInterpolationQuality(context, kCGInterpolationMedium);
-    CGContextDrawImage(context, CGRectMake(0, 0, 1, 1), cg);
+    CGContextSetInterpolationQuality(context, kCGInterpolationLow);
+    CGContextDrawImage(context, CGRectMake(0, 0, kSide, kSide), cg);
     CGContextRelease(context);
-    return [UIColor colorWithRed:pixel[0] / 255.0 green:pixel[1] / 255.0 blue:pixel[2] / 255.0 alpha:1];
+
+    CGFloat best = -1;
+    UIColor *picked = nil;
+    for (int i = 0; i < kSide * kSide; i++) {
+        UIColor *color = [UIColor colorWithRed:pixels[i * 4] / 255.0 green:pixels[i * 4 + 1] / 255.0
+                                         blue:pixels[i * 4 + 2] / 255.0 alpha:1];
+        CGFloat h = 0, s = 0, v = 0, a = 1;
+        if (![color getHue:&h saturation:&s brightness:&v alpha:&a]) continue;
+        // Saturation first: a bright white patch is worth less than a dim colored one, a black one nothing.
+        CGFloat score = s * 0.75 + v * 0.25;
+        if (score > best) {
+            best = score;
+            picked = color;
+        }
+    }
+    return picked;
 }
 
 UIColor *SGFBlack(void) {
@@ -37,17 +54,17 @@ UIColor *SGFAccent(void) {
 
 // The cover's hue kept, its pull on the eye set to `saturation` and `brightness`; a color too gray to read
 // as a color gives the accent back whole.
-static UIColor *tinted(UIColor *average, CGFloat saturation, CGFloat brightness) {
+static UIColor *tinted(UIColor *color, CGFloat saturation, CGFloat brightness) {
     CGFloat h = 0, s = 0, b = 0, a = 1;
-    if (!average || ![average getHue:&h saturation:&s brightness:&b alpha:&a] || s < 0.08) return SGFAccent();
+    if (!color || ![color getHue:&h saturation:&s brightness:&b alpha:&a] || s < 0.06) return SGFAccent();
     return [UIColor colorWithHue:h saturation:MIN(1, s * saturation) brightness:MIN(1, b * brightness) alpha:1];
 }
 
 UIColor *SGFWashForImage(UIImage *image) {
-    return tinted(averageColor(image), 0.85, 0.42);
+    return tinted(dominantColor(image), 1.15, 0.52);
 }
 
 UIColor *SGFGlowForImage(UIImage *image) {
     // Bright enough to read over the wash and under white text, never a second white.
-    return tinted(averageColor(image), 1.05, 0.95);
+    return tinted(dominantColor(image), 1.05, 0.95);
 }

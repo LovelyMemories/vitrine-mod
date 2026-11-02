@@ -80,6 +80,22 @@ artwork. The cover is not hidden — `SGRPlayerSetCoverHidden` would be the tidi
 own frame is measured from that cover, hiding it can leave the band without a frame, and then the switch
 goes with it.
 
+## The progress line
+
+Spotify's own slider stays, with its drag, its seeking and its accessibility. Flow lays a waveform over it
+and makes the slider's track and thumb transparent, so only the picture changes.
+
+The bars are the song's real shape, not a decoration: the spectrum the player taps is turned into a
+loudness ten times a second and kept in the bar the song is passing then, so the part already heard fills
+in and the rest stays flat until it is reached. A seek invents nothing — what is behind the jump keeps the
+shape it got. `Flow/Player/FlowWaveform.m`.
+
+**When there is no tap, there is no shape.** Some builds of the app do not import `AudioOutputUnitStart`,
+which Spotify's own output has to be reached through; the log then says `Spotify's output cannot be
+reached`, and the same reason takes Speed and pitch, Music Haptics and Sing's model with it. On such a
+build the line falls back to a plain two-tone bar — where the song is, without pretending to know how it
+sounds. The bars never appear from nothing.
+
 ## What is real, and what is not
 
 | Shown | Source | Honest? |
@@ -92,7 +108,7 @@ goes with it.
 | Credits | Spotify's credits card, where present | yes, and absent otherwise |
 | BPM "vibe" words | — | **no**: no mood data exists; show the number, not a mood |
 | Producer feed, "verified" notes | — | **no**: nothing in the app has this; omit |
-| Whole-track waveform | — | **no**: the tap sees only what played |
+| Waveform | the tap's loudness, kept per bar as the song plays | yes for what has played; the rest is not known until it plays |
 
 Flow must not ship a screen that invents content. A mode that has nothing to show shows nothing.
 

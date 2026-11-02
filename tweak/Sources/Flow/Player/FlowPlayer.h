@@ -2,9 +2,10 @@
 // -- with the band it gives the cover taken over by one mode at a time.
 //
 //     FlowPlayerPanel.m   the band, its switch and the content of each mode
-//     FlowAura.m          the line being sung, in the room the cover leaves
-//     FlowBside.m         the model's voice and rest, metered
-//     FlowSynesthesia.m   the spectrum as a row of bars
+//     FlowAura.m          Flow's own smaller cover, and the line being sung under it
+//     FlowBside.m         the model's two halves, mixed and metered
+//     FlowWaveform.m      the progress line, built from the song as it plays
+//     FlowSynesthesia.m   the spectrum as a row of bars -- built, but not offered: its tap never reached it
 //     FlowPlayer.x        the panel put on the player and laid out with it
 //
 // Aura is the band as Spotify draws it -- the cover, with Flow's light behind it -- and the three lines

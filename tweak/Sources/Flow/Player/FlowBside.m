@@ -1,16 +1,13 @@
 // Flow's B-Side mode: the song's two halves, mixed and metered.
 //
 // Two rows, the voice and the rest, each with a slider and a meter. The meters are Sing's own separation
-// (Shared/Sing): the RMS of each, per tenth of a second, through SGSingReadLevels. Nothing is read while
-// Sing is off: reading is what makes the model separate, and a meter is not worth running the Neural
-// Engine for.
+// (Shared/Sing) through SGSingReadLevels; nothing is read while Sing is off, since reading is what makes
+// the model separate.
 //
-// The sliders are real gains, not decoration: the voice's is Sing's own level (SGSetSingLevel), the rest's
-// is the engine's second gain (SGSetSingRest), which scales the rest of the song beside it. Both are put
-// back where they were when the mode lets go — a player's control, not a setting — so leaving B-Side
-// cannot leave the song half mixed.
-//
-// Nothing here claims four stems: Sing's model gives the voice and everything else.
+// The sliders are real gains: the voice's is Sing's own level (SGSetSingLevel), the rest's is the engine's
+// second gain (SGSetSingRest), which scales the rest beside it. Both go back where they were when the mode
+// lets go. When Sing is off the card says so and offers the switch that turns it on, rather than leaving
+// the reader to find a setting three pages away.
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 #import <math.h>
@@ -19,13 +16,23 @@
 #import "Shared/Sing/Sing.h"
 #import "FlowBside.h"
 
-// Two rows, their meters and the line under them.
-static const CGFloat kCardHeight = 124;
+// Two rows, their meters and the line (or the button) under them.
+static const CGFloat kCardHeight = 152;
+
+// A small round thumb of Flow's own, so a slider reads as a mixer and not as a system control.
+static UIImage *dot(CGFloat diameter, UIColor *color) {
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(diameter, diameter)];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        [color setFill];
+        [[UIBezierPath bezierPathWithOvalInRect:CGRectMake(0, 0, diameter, diameter)] fill];
+    }];
+}
 
 @implementation SGFBsideView {
     UIVisualEffectView *_card;
     UILabel *_voice, *_rest, *_status;
     UISlider *_voiceSlider, *_restSlider;
+    UIButton *_sing;
     UIView *_voiceTrack, *_restTrack, *_voiceFill, *_restFill;
     NSTimer *_timer;
     CGFloat _voiceShare, _restShare;
@@ -37,10 +44,10 @@ static const CGFloat kCardHeight = 124;
     if (!(self = [super initWithFrame:frame])) return nil;
     self.backgroundColor = UIColor.clearColor;
     _card = [[UIVisualEffectView alloc] initWithEffect:SGGlassEffect()];
-    _card.layer.cornerRadius = 20;
+    _card.layer.cornerRadius = 22;
     _card.layer.masksToBounds = YES;
     _card.layer.borderWidth = 1;
-    _card.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.08].CGColor;
+    _card.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.10].CGColor;
     [self addSubview:_card];
 
     UIFont *small = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
@@ -55,6 +62,15 @@ static const CGFloat kCardHeight = 124;
     _restSlider = [self addSlider];
     [_voiceSlider addTarget:self action:@selector(voiceChanged) forControlEvents:UIControlEventValueChanged];
     [_restSlider addTarget:self action:@selector(restChanged) forControlEvents:UIControlEventValueChanged];
+
+    _sing = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_sing setTitle:SGLocalized(@"Turn on Sing") forState:UIControlStateNormal];
+    [_sing setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    _sing.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    _sing.backgroundColor = SGFAccent();
+    _sing.layer.cornerRadius = 10;
+    [_sing addTarget:self action:@selector(singTapped) forControlEvents:UIControlEventTouchUpInside];
+    [_card.contentView addSubview:_sing];
 
     _voiceTrack = [self addTrack];
     _restTrack = [self addTrack];
@@ -83,7 +99,10 @@ static const CGFloat kCardHeight = 124;
     slider.minimumValue = 0;
     slider.maximumValue = 1;
     slider.minimumTrackTintColor = SGFAccent();
-    slider.maximumTrackTintColor = [UIColor colorWithWhite:1 alpha:0.18];
+    slider.maximumTrackTintColor = [UIColor colorWithWhite:1 alpha:0.14];
+    UIImage *thumb = dot(14, UIColor.whiteColor);
+    [slider setThumbImage:thumb forState:UIControlStateNormal];
+    [slider setThumbImage:thumb forState:UIControlStateHighlighted];
     [_card.contentView addSubview:slider];
     return slider;
 }
@@ -110,6 +129,11 @@ static const CGFloat kCardHeight = 124;
 
 - (void)restChanged {
     SGSetSingRest(_restSlider.value);
+}
+
+- (void)singTapped {
+    SGSetSingOn(YES);
+    [self tick];
 }
 
 - (void)didMoveToWindow {
@@ -160,11 +184,16 @@ static const CGFloat kCardHeight = 124;
     // RMS of a song runs low; the ear does not.
     _voiceShare = heard ? powf(MIN(1, voice * 3.5f), 0.7f) : 0;
     _restShare = heard ? powf(MIN(1, other * 3.5f), 0.7f) : 0;
-    NSString *status = nil;
-    if (!on) status = @"Sing is off. Turn it on and the model's two halves show here.";
-    else if (!heard) status = SGSingStatusText() ?: @"The separation model is not loaded.";
-    status = status ? SGLocalized(status) : @"";
-    if (![_status.text isEqualToString:status]) _status.text = status;
+
+    // Off: the switch that turns it on stands where the line would be.
+    _sing.hidden = on;
+    if (on) {
+        NSString *status = heard ? @"" : (SGSingStatusText() ?: @"The separation model is not loaded.");
+        status = status.length ? SGLocalized(status) : @"";
+        if (![_status.text isEqualToString:status]) _status.text = status;
+    } else {
+        _status.text = SGLocalized(@"Sing is off. Turn it on and the model's two halves show here.");
+    }
     [self setNeedsLayout];
 }
 
@@ -175,19 +204,22 @@ static const CGFloat kCardHeight = 124;
     // Inset from the screen's edges, as the player's own title and controls are.
     _card.frame = CGRectMake(8, height - cardHeight, MAX(0, width - 16), cardHeight);
 
-    CGFloat pad = 16, labelWidth = 72, gap = 8, sliderHeight = 30;
+    CGFloat pad = 18, labelWidth = 72, gap = 8, sliderHeight = 30;
     CGFloat inner = MAX(0, CGRectGetWidth(_card.bounds) - pad * 2);
     CGFloat sliderWidth = MAX(0, inner - labelWidth - gap);
 
-    _voice.frame = CGRectMake(pad, 8, labelWidth, 14);
-    _voiceSlider.frame = CGRectMake(pad + labelWidth + gap, 0, sliderWidth, sliderHeight);
-    _voiceTrack.frame = CGRectMake(pad, 34, inner, 3);
+    _voice.frame = CGRectMake(pad, 14, labelWidth, 14);
+    _voiceSlider.frame = CGRectMake(pad + labelWidth + gap, 6, sliderWidth, sliderHeight);
+    _voiceTrack.frame = CGRectMake(pad, 42, inner, 3);
 
-    _rest.frame = CGRectMake(pad, 50, labelWidth, 14);
-    _restSlider.frame = CGRectMake(pad + labelWidth + gap, 42, sliderWidth, sliderHeight);
-    _restTrack.frame = CGRectMake(pad, 76, inner, 3);
+    _rest.frame = CGRectMake(pad, 56, labelWidth, 14);
+    _restSlider.frame = CGRectMake(pad + labelWidth + gap, 48, sliderWidth, sliderHeight);
+    _restTrack.frame = CGRectMake(pad, 84, inner, 3);
 
-    _status.frame = CGRectMake(pad, 84, inner, 32);
+    _status.frame = CGRectMake(pad, 96, inner, 32);
+    CGSize button = CGSizeMake(MIN(inner, 176), 34);
+    _sing.frame = CGRectMake(pad, 96 + (32 - button.height) / 2, button.width, button.height);
+
     // A meter always shows a sliver, so a silent half reads as a meter at rest rather than as a missing row.
     _voiceFill.frame = CGRectMake(0, 0, inner * MAX(0.02, _voiceShare), 3);
     _restFill.frame = CGRectMake(0, 0, inner * MAX(0.02, _restShare), 3);

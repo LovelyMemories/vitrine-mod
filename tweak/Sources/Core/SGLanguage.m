@@ -63,6 +63,7 @@ static NSDictionary<NSString *, NSString *> *table(void) {
             @"Sing is off. Turn it on and the model's two halves show here.": @"Sing выключен. Включи его — и здесь появятся две половины, которые слышит модель.",
             @"The model's own two halves. Turning them apart comes next.": @"Две половины, которые слышит модель. Разводить их — следующий шаг.",
             @"The separation model is not loaded.": @"Модель разделения не загружена.",
+            @"Turn on Sing": @"Включить Sing",
             @"Lyrics": @"Тексты",
             @"Lyrics Style": @"Стиль текстов",
             @"Albums": @"Альбомы",

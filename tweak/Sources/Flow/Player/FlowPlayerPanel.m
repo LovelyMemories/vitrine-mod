@@ -13,15 +13,18 @@
 #import "FlowPlayer.h"
 #import "FlowAura.h"
 #import "FlowBside.h"
-#import "FlowSynesthesia.h"
+#import "FlowWaveform.h"
 
 static char kPanelKey;
+static char kWaveKey;
 static const CGFloat kBarHeight = 34;
 // Wide enough for three names, narrow enough to read as a switch rather than a second title.
 static const CGFloat kBarMaxWidth = 260;
 
 NSArray<NSString *> *SGFPlayerModeNames(void) {
-    return @[SGLocalized(@"Aura"), @"B-Side", SGLocalized(@"Synesthesia")];
+    // Synesthesia is not offered: its bars read a tap that never reached it, and the mode is gone from the
+    // player until that has an answer. The enum keeps its value so a stored mode still maps to something.
+    return @[SGLocalized(@"Aura"), @"B-Side"];
 }
 
 BOOL SGFPlayerHidesVolume(void) {
@@ -39,20 +42,29 @@ BOOL SGFPlayerHidesVolume(void) {
     UIView *_bar;
     UIView *_content;
     SGFAuraView *_aura;
-    SGFSynesthesiaView *_synesthesia;
     SGFBsideView *_bside;
     NSMutableArray<UIButton *> *_tabs;
     SGFPlayerMode _mode;
     UIImage *_artwork;
     NSInteger _restyleTick;
+    CAGradientLayer *_gradient;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
-    self.backgroundColor = UIColor.clearColor;
+    self.backgroundColor = SGFBlack();
+    self.clipsToBounds = YES;
+    // The band is painted by Flow: the cover's color at its top going to black, so nothing of Spotify's
+    // shows through and the artwork Flow draws sits on Flow's own ground.
+    _gradient = [CAGradientLayer layer];
+    _gradient.colors = @[(id)[SGFBlack() colorWithAlphaComponent:0.92].CGColor, (id)SGFBlack().CGColor];
+    [self.layer addSublayer:_gradient];
+    // A new track's artwork arrives by notification. Without this the band kept the cover it first saw.
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(artworkChanged)
+                                               name:SGRNowPlayingArtworkDidChangeNotification object:nil];
     // Where it was left, so a player opened again comes back to the mode last looked at.
     NSInteger stored = SGInt(SGFKeyPlayerMode, SGFPlayerModeAura);
-    _mode = stored >= SGFPlayerModeAura && stored <= SGFPlayerModeSynesthesia ? (SGFPlayerMode)stored : SGFPlayerModeAura;
+    _mode = stored >= SGFPlayerModeAura && stored <= SGFPlayerModeBside ? (SGFPlayerMode)stored : SGFPlayerModeAura;
 
     _bar = [UIView new];
     _bar.backgroundColor = [UIColor colorWithWhite:1 alpha:0.10];
@@ -123,10 +135,6 @@ BOOL SGFPlayerHidesVolume(void) {
         _aura.artwork = _artwork;
         return _aura;
     }
-    if (mode == SGFPlayerModeSynesthesia) {
-        if (!_synesthesia) _synesthesia = [[SGFSynesthesiaView alloc] initWithFrame:_content.bounds];
-        return _synesthesia;
-    }
     if (mode == SGFPlayerModeBside) {
         if (!_bside) _bside = [[SGFBsideView alloc] initWithFrame:_content.bounds];
         return _bside;
@@ -134,31 +142,62 @@ BOOL SGFPlayerHidesVolume(void) {
     return nil;
 }
 
-// The artwork the mod already read, and the wash it gives the band. The panel paints the band itself, so
-// Spotify's own cover and the lyric preview under it are behind Flow's background: nothing Flow draws can
-// land on either.
+// The playing track's picture changed: read it again, and again a moment later, since a new track's art
+// often arrives after its notification.
+- (void)artworkChanged {
+    _artwork = nil;
+    [self refreshArtwork];
+    [self setNeedsLayout];
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [weakSelf refreshArtwork];
+    });
+}
+
+// The artwork the mod already read, and the wash it gives the band.
 - (void)refreshArtwork {
     UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
     if (image == _artwork) return;
     _artwork = image;
-    self.backgroundColor = image ? SGFWashForImage(image) : SGFBlack();
+    UIColor *wash = image ? SGFWashForImage(image) : SGFBlack();
+    _gradient.colors = @[(id)[wash colorWithAlphaComponent:0.92].CGColor, (id)SGFBlack().CGColor];
     _aura.artwork = image;
 }
 
-// Spotify's own progress slider, drawn Flow's way: a thin track, the played part in the cover's light and a
-// small round thumb. It stays Spotify's slider, with its drag, its seeking and its accessibility; only its
-// colors change. Walked every twentieth pass, since the tree is the player's.
+// Spotify's own progress slider, with Flow's waveform over it: the slider's track and thumb go, the bars
+// take their place, and the slider itself stays where it is, under them, taking the drag and the seek.
+// A view that takes no touches lets the slider beneath it have every one.
+- (void)dressSlider:(UISlider *)slider {
+    UIView *parent = slider.superview;
+    if (!parent) return;
+    SGFWaveformView *wave = objc_getAssociatedObject(slider, &kWaveKey);
+    if (!wave) {
+        wave = [[SGFWaveformView alloc] initWithFrame:slider.frame];
+        wave.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(slider, &kWaveKey, wave, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (wave.superview != parent) [parent addSubview:wave];
+    // Taller than the slider's own frame: a UISlider's bounds are mostly its thin track, and the bars need
+    // room to be a waveform rather than a line.
+    CGRect want = CGRectInset(slider.frame, 0, -6);
+    if (!CGRectEqualToRect(wave.frame, want)) wave.frame = want;
+    slider.minimumTrackTintColor = UIColor.clearColor;
+    slider.maximumTrackTintColor = UIColor.clearColor;
+    slider.thumbTintColor = UIColor.clearColor;
+}
+
+// Walked every twentieth pass, since the tree walked is the player's.
 - (void)restyleSlidersIn:(UIView *)host {
-    if (!host || (++_restyleTick % 20)) return;
+    if (!host) return;
+    // The first pass and then every twentieth: a player that is still lays out only a few times.
+    NSInteger tick = ++_restyleTick;
+    if (tick != 1 && tick % 20) return;
     NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:host];
     while (queue.count) {
         UIView *view = queue.lastObject;
         [queue removeLastObject];
         if ([view isKindOfClass:UISlider.class] && ![view isDescendantOfView:self]) {
-            UISlider *slider = (UISlider *)view;
-            slider.minimumTrackTintColor = SGFAccent();
-            slider.maximumTrackTintColor = [UIColor colorWithWhite:1 alpha:0.16];
-            slider.thumbTintColor = UIColor.whiteColor;
+            [self dressSlider:(UISlider *)view];
         }
         [queue addObjectsFromArray:view.subviews];
     }
@@ -167,6 +206,10 @@ BOOL SGFPlayerHidesVolume(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     [self refreshArtwork];
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    _gradient.frame = self.bounds;
+    [CATransaction commit];
     CGFloat width = MIN(CGRectGetWidth(self.bounds) - 32, kBarMaxWidth);
     _bar.frame = CGRectMake((CGRectGetWidth(self.bounds) - width) / 2, 0, width, kBarHeight);
     CGFloat inset = 4, tabWidth = (width - inset * 2) / (CGFloat)_tabs.count;
@@ -175,11 +218,9 @@ BOOL SGFPlayerHidesVolume(void) {
     }
     CGFloat top = CGRectGetMaxY(_bar.frame) + 12;
     _content.frame = CGRectMake(0, top, CGRectGetWidth(self.bounds), MAX(0, CGRectGetHeight(self.bounds) - top));
-    _synesthesia.frame = _content.bounds;
     _bside.frame = _content.bounds;
     _aura.frame = _content.bounds;
 }
-
 @end
 
 UIView *SGFPlayerPanelIn(UIView *host) {
@@ -199,9 +240,9 @@ void SGFPlayerPanelLayout(UIView *host) {
     CGRect area = SGRPlayerArtworkAreaIn(host);
     // Nothing to draw into: no cover has laid out yet, or the player is closing.
     if (CGRectIsNull(area) || area.size.height < 80) {
-        // Once it has a place, a pass that cannot measure keeps the last one. Hiding the cover for
-        // Synesthesia can leave the band without a frame for a pass, and the panel -- the switch included --
-        // must not blink out with it, or the mode that hid the cover could not be left again.
+        // Once it has a place, a pass that cannot measure keeps the last one. Spotify gives the band no
+        // frame for a pass here and there (a track change, the player settling), and the panel -- the switch
+        // included -- must not blink out with it.
         if (!CGRectIsNull(panel.area)) {
             panel.hidden = NO;
             return;
@@ -221,6 +262,11 @@ void SGFPlayerPanelLayout(UIView *host) {
     panel.area = area;
     panel.hidden = NO;
     panel.frame = area;
+    static BOOL logged;
+    if (!logged) {
+        logged = YES;
+        SGLog(@"flow: the band in %@, mode %ld", NSStringFromCGRect(area), (long)SGInt(SGFKeyPlayerMode, 0));
+    }
     [panel setNeedsLayout];
     [panel restyleSlidersIn:host];
 }

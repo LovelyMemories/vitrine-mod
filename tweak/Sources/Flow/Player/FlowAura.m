@@ -106,29 +106,26 @@ static const CGFloat kCoverSide = 240;
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat width = CGRectGetWidth(self.bounds), height = CGRectGetHeight(self.bounds);
-    const CGFloat nowHeight = 44, lineHeight = 32, gap = 6, foot = 4;
+    const CGFloat nowHeight = 44, lineHeight = 32, gap = 6;
 
-    // The cover takes what is left once the lines have their room, and never more than the mock's 240pt.
-    CGFloat linesRoom = nowHeight + lineHeight + gap + foot;
-    CGFloat side = MIN(kCoverSide, MIN(width - 40, height - linesRoom - 14));
-    _cover.hidden = side < 96;
-    if (_cover.hidden) side = 0;
-    _cover.frame = CGRectMake((width - side) / 2, 0, side, side);
+    // The cover and the lines are one block, centred in the band: the band is tall, and a cover pinned to
+    // its top leaves a hole under it.
+    CGFloat linesHeight = nowHeight + lineHeight + gap;
+    CGFloat side = MIN(kCoverSide, MIN(width - 40, height - linesHeight - 32));
+    if (side < 96) side = 0;
+    CGFloat block = (side > 0 ? side + 18 : 0) + linesHeight;
+    CGFloat top = MAX(0, floor((height - block) / 2));
 
-    CGFloat top = (side > 0 ? side + 14 : 0) + foot;
-    CGFloat room = height - top;
-    _fitsBefore = room >= nowHeight + lineHeight + gap;
-    _fitsAfter = room >= nowHeight + 8;
-    if (_fitsBefore) top += lineHeight + gap;
+    _cover.hidden = side <= 0;
+    _cover.frame = CGRectMake((width - side) / 2, top, side, side);
+    top += (side > 0 ? side + 18 : 0);
 
-    _now.frame = CGRectMake(8, top, width - 16, nowHeight);
-    top += nowHeight;
-    if (_fitsAfter) {
-        _after.frame = CGRectMake(8, top + 2, width - 16, lineHeight);
-    }
-    if (_fitsBefore) {
-        _before.frame = CGRectMake(8, CGRectGetMinY(_now.frame) - lineHeight - gap, width - 16, lineHeight);
-    }
+    _fitsBefore = top >= lineHeight + gap;
+    _fitsAfter = YES;
+    CGFloat linesTop = top + (_fitsBefore ? lineHeight + gap : 0);
+    _now.frame = CGRectMake(10, linesTop, width - 20, nowHeight);
+    _after.frame = CGRectMake(10, linesTop + nowHeight + 2, width - 20, lineHeight);
+    _before.frame = CGRectMake(10, linesTop - lineHeight - gap, width - 20, lineHeight);
 }
 
 @end

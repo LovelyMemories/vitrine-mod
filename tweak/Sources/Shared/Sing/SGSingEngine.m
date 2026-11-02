@@ -69,7 +69,6 @@ struct SGSingEngine {
     struct { double when; uint64_t ahead; } asked[kAsked];
     unsigned askedNext;
     atomic_uint levelBits, targetLead, voiceAngleBits;
-    atomic_uint restBits;               // the rest's own gain beside the vocals' level, 1 as the song has it
     atomic_bool spatial;                // Spatial voice on: Distance and Room apply
     atomic_uint distanceBits, roomBits; // meters, and 0 to 1
     atomic_uint widthBits;              // the instruments' stereo width, 1 as the song has it
@@ -152,12 +151,11 @@ static OSStatus pullInto(SGSingEngine *engine, uint64_t at, uint64_t count, SGSi
     return noErr;
 }
 
-// The gains for a level: the vocals up to 1, then the rest down to nothing at 2. `rest` scales whatever of
-// the rest that leaves, 1 as the song has it; Flow's B-Side asks for less.
-static void gainsFor(float level, float rest, float *vocals, float *other) {
+// The gains for a level: the vocals up to 1, then the rest down to nothing at 2.
+static void gainsFor(float level, float *vocals, float *other) {
     level = fmaxf(0, fminf(level, 2));
     *vocals = fminf(level, 1);
-    *other = (level <= 1 ? 1 : 2 - level) * fmaxf(0, fminf(rest, 1));
+    *other = level <= 1 ? 1 : 2 - level;
 }
 
 // Where the voice is put at an angle: each ear's gain, delay in frames and low-pass coefficient (1 passes).
@@ -269,7 +267,7 @@ OSStatus SGSingEngineRender(SGSingEngine *engine, UInt32 frames, float *left, fl
     atomic_store_explicit(&engine->mixing, mixing, memory_order_relaxed);
     atomic_store_explicit(&engine->spent, engine->recovering, memory_order_relaxed);
     float vocalsTo, otherTo;
-    gainsFor(loadFloat(&engine->levelBits), loadFloat(&engine->restBits), &vocalsTo, &otherTo);
+    gainsFor(loadFloat(&engine->levelBits), &vocalsTo, &otherTo);
     float vocalsStep = (vocalsTo - engine->vocalsGain) / frames, otherStep = (otherTo - engine->otherGain) / frames;
     float directTo = 1, sendTo = 0, widthTo = 1;
     if (atomic_load_explicit(&engine->spatial, memory_order_relaxed)) {
@@ -496,7 +494,6 @@ SGSingEngine *SGSingEngineCreate(void) {
     engine->vocalsGain = engine->otherGain = engine->directGain = engine->width = 1;
     storeFloat(&engine->widthBits, 1);
     storeFloat(&engine->levelBits, 1);
-    storeFloat(&engine->restBits, 1);
     storeFloat(&engine->distanceBits, kNearest);
     engine->room = SGDSPReverbCreate(kSGSingRate, kRoomPreset, 0);
     if (engine->room) {
@@ -579,10 +576,6 @@ bool SGSingEngineSeparating(SGSingEngine *engine) {
 
 void SGSingEngineSetLevel(SGSingEngine *engine, float level) {
     storeFloat(&engine->levelBits, level);
-}
-
-void SGSingEngineSetRestLevel(SGSingEngine *engine, float rest) {
-    storeFloat(&engine->restBits, isfinite(rest) ? fminf(1, fmaxf(0, rest)) : 1);
 }
 
 void SGSingEngineSetSpatial(SGSingEngine *engine, bool on, float meters, float room, float width) {

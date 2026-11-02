@@ -638,7 +638,8 @@ static BOOL beginTrack(NSString *track) {
 // Fluid, Animated and the Visualizer share the field, so the menu moves between them without a restart. The
 // other backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
 BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
-    return sg_follower && SGRPlayerBackground() >= SGRPlayerBackgroundFluid;
+    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    return sg_follower && background >= SGRPlayerBackgroundFluid && background <= SGRPlayerBackgroundVisualiser;
 }
 
 BOOL SGPlayerMenuAnimatedArtwork(void) {
@@ -694,7 +695,7 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
 %ctor {
     if (!SGRedesignedUI()) return;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
-    if (background < SGRPlayerBackgroundFluid) return;
+    if (background < SGRPlayerBackgroundFluid || background > SGRPlayerBackgroundVisualiser) return;
     sg_videos = [NSHashTable weakObjectsHashTable];
     // Here rather than on the clip's view, which is gone while they hold it off: the track is walked again
     // as either changes. The power state is reported off the main thread, which must not wait for main

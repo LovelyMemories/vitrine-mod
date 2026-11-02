@@ -351,12 +351,11 @@ static void SGApplyStarterDefaults(void) {
     if ([defaults boolForKey:kStarter]) return;
     for (NSString *key in @[SGKeyBlockTelemetry, SGKeyCleanLinks])
         SGSetEnabled(key, YES);
-    // Off, not just unset: the build's own default of the look is the redesign (Core/SGUIMode.m), and the ads have
-    // to be Spotify's here. So the tour opens with both cards off and the person picks; going on restarts Spotify
-    // either way, the switches being read at launch.
-    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium, SGKeyRedesignUntested])
+    // Off, not just unset: the build's own default of the redesign is on (Core/SGUIMode.m), and the ads have to be
+    // Spotify's here. So the tour opens with both cards off and the person picks; going on restarts Spotify either
+    // way, the switches being read at launch.
+    for (NSString *key in @[SGKeyHideAds, SGKeyHideUpsells, SGKeyFakePremium, SGKeyRedesign, SGKeyRedesignUntested])
         SGSetEnabled(key, NO);
-    SGSetInt(SGKeyLook, SGUILookNative);
     SGSetInt(SGRKeyPlayerBackground, SGRPlayerBackgroundAnimated);
     SGSetInt(SGKeyLanguage, 1);
     SGSetEnabled(SGKeyMusicHaptics, YES);

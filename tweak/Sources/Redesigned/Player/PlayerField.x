@@ -43,11 +43,11 @@ SGRArtworkField *SGRPlayerField(void) {
 
 SGRPlayerBackgroundKind SGRPlayerBackground(void) {
     NSInteger kind = SGInt(SGRKeyPlayerBackground, SGEnabled(SGRKeyPlayerMotion) ? SGRPlayerBackgroundColours : SGRPlayerBackgroundStill);
-    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundVisualiser ? kind : SGRPlayerBackgroundColours;
+    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundCover ? kind : SGRPlayerBackgroundColours;
 }
 
 NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
-    return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualizer"];
+    return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualizer", @"Aurora", @"Cover"];
 }
 
 // A paused song holds the colors still, the way it rests the cover (PlayerArtwork.x), and so does what lies over
@@ -97,7 +97,10 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     field.showsBackdrop = YES;
     SGRPlayerBackgroundKind background = SGRPlayerBackground();
     field.flows = background == SGRPlayerBackgroundColours;
-    field.fluid = background >= SGRPlayerBackgroundFluid;
+    // Fluid is what Animated and the Visualizer show over: they are the picture either way.
+    field.fluid = background == SGRPlayerBackgroundFluid || background >= SGRPlayerBackgroundAnimated && background <= SGRPlayerBackgroundVisualiser;
+    field.aurora = background == SGRPlayerBackgroundAurora;
+    field.showsCover = background == SGRPlayerBackgroundCover;
     field.motionHeld = fieldHeld();
     field.bleed = kBleed;
     objc_setAssociatedObject(plane, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);

@@ -53,9 +53,6 @@ bool SGSingEngineOn(SGSingEngine *engine);
 bool SGSingEngineSeparating(SGSingEngine *engine);
 // The vocals' level from 0 (gone) through 1 (as the song has them) to 2 (the vocals alone, the rest gone).
 void SGSingEngineSetLevel(SGSingEngine *engine, float level);
-// The rest of the song's own gain beside that level: 1 as the song has it, 0 gone. A player's control rather
-// than a setting — Flow's B-Side puts it back when it lets go — so nothing stores it.
-void SGSingEngineSetRestLevel(SGSingEngine *engine, float rest);
 // Where the separated voice sounds, in radians to the listener's right of straight ahead (left is negative,
 // behind sounds as the front does): 0, where it starts, leaves the vocals exactly as the song has them. The
 // render glides to a new angle over a few tens of milliseconds, so it can be set as often as the head moves.

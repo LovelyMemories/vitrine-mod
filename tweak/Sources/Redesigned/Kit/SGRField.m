@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "SGRField.h"
 #import "SGRFlow.h"
+#import "SGRAurora.h"
 #import "SGRFluid.h"
 #import "SGRBridges.h"
 #import "SGRPalette.h"
@@ -69,7 +70,11 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     CALayer *_backdrop;
     SGRFlowLayer *_flow;
     SGRFluidLayer *_fluidLayer;
+    SGRauroraLayer *_auroraLayer;
+    CALayer *_cover;
+    CAGradientLayer *_coverShade;
     BOOL _watching;
+    NSArray<UIColor *> *_colors;   // the artwork's flow colors, for the aurora
     UIColor *_color;
     UIImage *_image;
     NSString *_identity;
@@ -138,6 +143,9 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     _fluidLayer.frame = painted;
     // The screen's part of it, so the copies turn about it and the shade ends at the screen's foot.
     _fluidLayer.visibleRect = CGRectMake(bleed.left, bleed.top, bounds.size.width, height);
+    _auroraLayer.frame = painted;
+    _cover.frame = painted;
+    _coverShade.frame = _cover.bounds;
     [CATransaction commit];
 }
 
@@ -146,14 +154,18 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 - (void)setFluid:(BOOL)fluid {
     if (fluid == _fluid) return;
     _fluid = fluid;
-    if (fluid) self.flows = NO;
+    if (fluid) {
+        self.flows = NO;
+        self.aurora = NO;
+        self.showsCover = NO;
+    }
     if (fluid && !_fluidLayer) {
         _fluidLayer = [SGRFluidLayer layer];
         [self.layer insertSublayer:_fluidLayer above:_solid];
     }
     // The fluid field is the whole picture, as the moving one is.
     _fluidLayer.hidden = !fluid || _covered;
-    _black.hidden = fluid || _flows;
+    _black.hidden = fluid || _flows || _aurora || _showsCover;
     if (fluid) _backdrop.hidden = YES;
     if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
     [self watch];
@@ -164,19 +176,95 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 - (void)setFlows:(BOOL)flows {
     if (flows == _flows) return;
     _flows = flows;
-    if (flows) self.fluid = NO;
+    if (flows) {
+        self.fluid = NO;
+        self.aurora = NO;
+        self.showsCover = NO;
+    }
     if (flows && !_flow) {
         _flow = [SGRFlowLayer layer];
         _flow.hidden = YES;
         [self.layer insertSublayer:_flow above:_solid];
     }
     // The moving field is the whole picture: no still backdrop over it, no fade to black under it.
-    _black.hidden = flows;
+    _black.hidden = flows || _fluid || _aurora || _showsCover;
     if (flows) _backdrop.hidden = YES;
     else _flow.hidden = YES;
     [self watch];
     [self updateMotion];
     [self setNeedsLayout];
+}
+
+- (void)setAurora:(BOOL)aurora {
+    if (aurora == _aurora) return;
+    _aurora = aurora;
+    if (aurora) {
+        self.flows = NO;
+        self.fluid = NO;
+        self.showsCover = NO;
+    }
+    if (aurora && !_auroraLayer) {
+        _auroraLayer = [SGRauroraLayer layer];
+        [self.layer insertSublayer:_auroraLayer above:_solid];
+    }
+    _auroraLayer.hidden = !aurora;
+    _black.hidden = aurora || _flows || _fluid || _showsCover;
+    if (aurora) {
+        _backdrop.hidden = YES;
+        if (_colors) [_auroraLayer setColors:_colors animated:NO];
+    }
+    [self watch];
+    [self updateMotion];
+    [self setNeedsLayout];
+}
+
+- (void)setShowsCover:(BOOL)showsCover {
+    if (showsCover == _showsCover) return;
+    _showsCover = showsCover;
+    if (showsCover) {
+        self.flows = NO;
+        self.fluid = NO;
+        self.aurora = NO;
+    }
+    if (showsCover && !_cover) {
+        _cover = [CALayer layer];
+        _cover.contentsGravity = kCAGravityResizeAspectFill;
+        _cover.masksToBounds = YES;
+        [self.layer insertSublayer:_cover above:_solid];
+        // A dark foot to the whole of it: white text sits on this, and the artwork's own bright middle must
+        // not win. The field's own black gradient is off under a cover.
+        _coverShade = [CAGradientLayer layer];
+        _coverShade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0.38].CGColor,
+                               (id)[UIColor colorWithWhite:0 alpha:0.78].CGColor];
+        [_cover addSublayer:_coverShade];
+    }
+    _cover.hidden = !showsCover;
+    _black.hidden = showsCover || _flows || _fluid || _aurora;
+    if (showsCover) {
+        _backdrop.hidden = YES;
+        if (_image) _cover.contents = (__bridge id)_image.CGImage;
+    }
+    [self watch];
+    [self updateMotion];
+    [self setNeedsLayout];
+}
+
+// The cover drifts as the others move: a slow zoom in and back, so a still page is never quite still.
+- (void)coverMoving:(BOOL)moving {
+    if (!_cover) return;
+    if (!moving) {
+        [_cover removeAnimationForKey:@"cover.zoom"];
+        return;
+    }
+    if ([_cover animationForKey:@"cover.zoom"]) return;
+    CABasicAnimation *zoom = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    zoom.fromValue = @(1.0);
+    zoom.toValue = @(1.08);
+    zoom.duration = 48;
+    zoom.autoreverses = YES;
+    zoom.repeatCount = HUGE_VALF;
+    zoom.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    [_cover addAnimation:zoom forKey:@"cover.zoom"];
 }
 
 - (void)setMotionHeld:(BOOL)held {
@@ -195,7 +283,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 }
 
 - (void)watch {
-    if (_watching || (!_flows && !_fluid)) return;
+    if (_watching || (!_flows && !_fluid && !_aurora && !_showsCover)) return;
     _watching = YES;
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, UIApplicationWillResignActiveNotification,
@@ -215,12 +303,14 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
 }
 
 - (void)updateMotion {
-    if (!_flow && !_fluidLayer) return;
+    if (!_flow && !_fluidLayer && !_auroraLayer && !_cover) return;
     // A locked phone keeps the player in its window, so being in front counts as much as being in one.
     BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
     BOOL may = self.window && front && !SGRPlayerIsTransitioning() && !SGRReduceMotion()
             && !NSProcessInfo.processInfo.lowPowerModeEnabled && !_motionHeld;
     _fluidLayer.moving = may && _fluid;
+    _auroraLayer.moving = may && _aurora && !_auroraLayer.hidden;
+    [self coverMoving:may && _showsCover];
     BOOL moving = may && _flows && !_flow.hidden;
     if (!_flow || moving == _flow.moving) return;
     _flow.moving = moving;
@@ -264,9 +354,10 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     _image = image;
     _identity = [identity copy];
     if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
+    if (_cover) _cover.contents = (__bridge id)image.CGImage;
     NSUInteger generation = ++_generation;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows, _mainColor};
-    if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows || _aurora, _mainColor};
+    if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
     __weak SGRArtworkField *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRArtworkField *field = weakSelf;
@@ -321,6 +412,15 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     _read = YES;
     // Under the veil the color goes in at once, and the page fades in with it.
     if (_veil) animated = NO;
+    if (palette.flowColors) _colors = palette.flowColors;
+    // The aurora first: its blobs are the picture, and the color under them is the field's own.
+    if (_aurora && _colors) {
+        [_auroraLayer setColors:_colors animated:animated && !_auroraLayer.hidden];
+        _auroraLayer.hidden = NO;
+        [self updateMotion];
+        [self applyColor:palette.fieldColor animated:animated];
+        return;
+    }
     if (_flows && palette.flowColors) {
         [_flow setColors:palette.flowColors animated:animated && !_flow.hidden];
         _flow.hidden = NO;
@@ -329,7 +429,7 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
         [self applyColor:_flow.baseColor animated:animated];
         return;
     }
-    if (_showsBackdrop && !_flows && !_fluid && palette.backdrop) {
+    if (_showsBackdrop && !_flows && !_fluid && !_aurora && !_showsCover && palette.backdrop) {
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         if (animated) {

@@ -47,6 +47,8 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundFluid,      // the artwork itself blurred and turning (SGRFluid.h)
     SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x)
     SGRPlayerBackgroundVisualiser, // a spectrum of the song over Fluid held still (PlayerVisualiser.m)
+    SGRPlayerBackgroundAurora,     // the artwork's colors as soft blobs drifting (SGRAurora.h)
+    SGRPlayerBackgroundCover,      // the artwork itself, full bleed and darkened, drifting slowly
 };
 // The player's ⋯ menu switches between the last three, which share the Fluid field, without a restart.
 SGRPlayerBackgroundKind SGRPlayerBackground(void);

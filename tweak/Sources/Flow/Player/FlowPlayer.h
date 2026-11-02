@@ -14,15 +14,13 @@
 // (PlayerLyrics.x's overlay comes first), so only one of them is ever in it.
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
+#import "Core/SGFlow.h"
 
 typedef NS_ENUM(NSInteger, SGFPlayerMode) {
     SGFPlayerModeAura = 0,          // the cover Spotify draws, over the color Flow puts behind it
-    SGFPlayerModeBside = 1,         // the model's voice and rest, metered (FlowBside.m)
+    SGFPlayerModeBside = 1,         // the model's voice and rest, mixed and metered (FlowBside.m)
     SGFPlayerModeSynesthesia = 2,   // the song's spectrum as a row of bars (FlowSynesthesia.m)
 };
-
-// The mode the band opens in, kept between songs and players; Aura until one is picked.
-#define SGFKeyPlayerMode @"spotifyglass.flow.player.mode"
 
 NSArray<NSString *> *SGFPlayerModeNames(void);
 // The band, made on first ask in the player's `host`; nil while the player has not laid out.

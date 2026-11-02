@@ -23,6 +23,8 @@
     uint64_t _generation;
     CGSize _laidOut;
     BOOL _fed;
+    BOOL _diagnosed;
+    int _quietTicks;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -57,6 +59,7 @@
 }
 
 - (void)leave {
+    // Given back before anything else can ask for it: a view that leaves must not hold the tap.
     if (_fed) {
         SGAudioSetOutputReader(NULL);
         _fed = NO;
@@ -68,9 +71,25 @@
 }
 
 - (void)tick {
+    // The audio tap is one for the whole app, and the redesign's own Visualizer takes and gives it back as
+    // its view moves. Taking it again on every tick costs an atomic store and makes the bars independent of
+    // whoever else asked for it last.
+    SGAudioSetOutputReader(SGRSpectrumFeed);
+    _fed = YES;
     uint64_t generation = SGRSpectrumRead(_levels);
-    // Nothing new since the last draw (paused, or the tap has not run): nothing to redraw.
-    if (generation == _generation) return;
+    if (generation == _generation) {
+        // Nothing new: paused, or the tap never ran. Said once, so a device log tells which.
+        if (!_diagnosed && ++_quietTicks > 60) {
+            _diagnosed = YES;
+            SGLog(@"flow: the spectrum has had nothing for 2 s (tick %d)", _quietTicks);
+        }
+        return;
+    }
+    _quietTicks = 0;
+    if (!_diagnosed) {
+        _diagnosed = YES;
+        SGLog(@"flow: the spectrum reads %llu analyses", (unsigned long long)generation);
+    }
     _generation = generation;
     [self setNeedsDisplay];
 }
@@ -87,6 +106,17 @@
     if (!context) return;
     CGFloat width = CGRectGetWidth(self.bounds), height = CGRectGetHeight(self.bounds);
     if (width < 1 || height < 1) return;
+    // The bars stand on the artwork's lower edge: a gradient into black is what makes the row read as part
+    // of the player rather than as marks on the cover. Drawn here rather than as a sublayer, which would
+    // lie over the bars: a layer's contents is under everything the layer's sublayers draw.
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGFloat components[] = {0, 0, 0, 0, 0, 0, 0, 0.8};
+    CGGradientRef gradient = CGGradientCreateWithColorComponents(space, components, NULL, 2);
+    if (gradient) {
+        CGContextDrawLinearGradient(context, gradient, CGPointMake(0, height - 110), CGPointMake(0, height), 0);
+        CGGradientRelease(gradient);
+    }
+    CGColorSpaceRelease(space);
     const CGFloat gap = 3;
     CGFloat cell = (width - gap * (SGRSpectrumBands - 1)) / SGRSpectrumBands;
     if (cell < 1) cell = 1;

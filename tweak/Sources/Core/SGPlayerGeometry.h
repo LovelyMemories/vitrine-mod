@@ -15,3 +15,7 @@ CGRect SGRPlayerCoverFrameIn(UIView *host);
 CGFloat SGRPlayerCoverScale(void);
 // Hides the cover on screen and its shadow, or shows them again, for a view of the mod's to stand in.
 void SGRPlayerSetCoverHidden(BOOL hidden);
+
+// The playing track's artwork as the mod last read it, in `trackURI` and `identity` if given; nil until it
+// has one. Defined by Redesigned/Kit/SGRBridges.x and declared here so Flow can draw the cover itself.
+UIImage *SGRNowPlayingArtwork(NSString **trackURI, NSString **identity);

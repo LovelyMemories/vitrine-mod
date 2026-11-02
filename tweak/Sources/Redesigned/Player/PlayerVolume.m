@@ -9,6 +9,7 @@
 #import <MediaPlayer/MediaPlayer.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
+#import "Core/SGFlow.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Player.h"
 
@@ -155,7 +156,8 @@ static void settle(UIView *stack, UIView *row, BOOL moved, CGRect frame) {
 
 BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin) {
     SGRVolumeRow *volume = objc_getAssociatedObject(stack, &kVolumeKey);
-    if (!SGRPlayerVolumeOn() || !controls) {
+    // Flow's player keeps its own foot and has no room for this row (Core/SGFlow.h).
+    if (!SGRPlayerVolumeOn() || !controls || SGFPlayerHidesVolume()) {
         if (volume) volume.alpha = 0;
         return NO;
     }

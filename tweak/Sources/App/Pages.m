@@ -1,4 +1,5 @@
 #import "Core/SGCore.h"
+#import "Core/SGFlow.h"
 #import "Shared/AppIcon/AppIcon.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
@@ -152,6 +153,14 @@ UIViewController *SGPlayerSettingsPage(void) {
         SGWithTile(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap", UIColor.systemBlueColor),
         SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor),
     ])];
+
+    // Flow's player: which of its three modes the band opens in. Flow only -- the redesign has no band, and
+    // the background picker below it still chooses what sits behind that band.
+    if (SGFlowUIStored()) {
+        [sections insertObject:SGSection(nil, @[
+            SGChoiceRow(@"Flow player", @"What the band of the player shows", SGFKeyPlayerMode, SGFPlayerModeNames(), 0),
+        ]) atIndex:0];
+    }
 
     // Apple Music's cover in the system's now playing, on until switched off (Shared/AppleCover).
     SGModRow *covers = SGSwitchRow(@"Apple Music covers", @"Its cover for the song on the lock screen, Control Center and CarPlay", SGKeyAppleCover);

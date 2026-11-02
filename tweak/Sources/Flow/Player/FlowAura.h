@@ -2,7 +2,6 @@
 #import <UIKit/UIKit.h>
 
 @interface SGFAuraView : UIView
-// Where Spotify's cover is, in this view's coordinates. Aura draws only under it, and nowhere when it
-// fills the band.
-@property (nonatomic) CGRect coverFrame;
+// The playing track's artwork, drawn smaller than the player's own cover; nil until one has been read.
+@property (nonatomic, strong) UIImage *artwork;
 @end

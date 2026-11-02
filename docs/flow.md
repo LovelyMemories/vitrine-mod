@@ -36,27 +36,31 @@ behind a mode's dense text is the player's existing dim, scaled by mode rather t
 
 ### Aura
 
-The cover as Spotify draws it, over the color Flow puts behind it, with the mod's switch above it.
+The band is Flow's, not Spotify's: the band's own background is the cover's wash, Flow draws the artwork
+itself — 240 pt at most, rounded, never the full square — and the sung line and its neighbours go under it.
+Spotify's own cover and the lyric preview it draws are *behind* that background, so nothing Flow draws can
+land on them and nothing of Spotify's can land on Flow. That is the whole reason the band is painted
+opaque rather than layered over.
 
-The line being sung and the two around it come from `Shared/Lyrics`' own lines (`SGKaraokeLeadLine`), the
-same ones the lock screen reads, so Aura is a reader rather than a second lyrics engine. They are drawn
-only in the room the cover leaves under it. The cover usually fills the band, and then Aura draws
-nothing: lying over the cover, or over the preview Spotify draws under it, is worse than showing no
-line at all. Where the cover does leave room, the three lines take it.
+The lines are `Shared/Lyrics`' own (`SGKaraokeLeadLine`), the same ones the lock screen reads. How many fit
+is measured from the room left under the cover: three, then two, then one.
 
 The tempo badge waits for a tempo: `SGMusicAnalyzer` hears hits, not a beat, and Flow does not print a
 number it has not measured.
 
 ### B-Side
 
-What the separation model hears, as it hears it: two meters, **Voice** and **Rest**, from Sing's own
-voice/rest split (`Shared/Sing`), read through `SGSingReadLevels`. Nothing is read while Sing is off:
-reading the levels is itself what makes the model separate, and running the Neural Engine for a meter is
-not a trade worth making. With Sing on, the meters show the model's two halves; with no model, or a phone
-too hot for it, they stay down and the line under them says what Sing is doing.
+What the separation model hears, as it hears it: two rows, **Voice** and **Rest**, each with a slider and
+a meter. The meters come from Sing's own voice/rest split (`Shared/Sing`) through `SGSingReadLevels`;
+nothing is read while Sing is off, since reading the levels is itself what makes the model separate and
+running the Neural Engine for a meter is not a trade worth making.
 
-Two independent gains over those halves — turning the voice down, the rest up — are the next step and
-need a change in Sing's engine, which mixes one level today. Four stems do not exist and are not claimed.
+The sliders are real gains. The voice's is Sing's own level (`SGSetSingLevel`); the rest's is
+`SGSingEngineSetRestLevel`, a second gain on the engine's rest path whose default of 1 leaves today's sound
+exactly as it was. Both are put back where they were when the mode lets go — a player's control, not a
+setting — so leaving B-Side cannot leave a song half mixed.
+
+Four stems do not exist and are not claimed: the model gives the voice and everything else.
 
 The credits half of the mode waits on a way to read the player's credits card; where Spotify has none,
 the mode shows nothing rather than invented names.
@@ -70,6 +74,12 @@ as the Visualizer does). Three styles — Fluid, Rings, Orbs — differ in geome
 A touch distorts the field: the crest nearest the finger is lifted and pushed aside, easing back over
 about a second. It is a drawing, not a simulation; nothing here is fluid dynamics.
 
+The bars stand on the foot of the band over a gradient into black, the way Aura's lines do: the cover stays
+Spotify's, and the scrim is what makes the row read as part of the player rather than as marks on the
+artwork. The cover is not hidden — `SGRPlayerSetCoverHidden` would be the tidier picture, but if the band's
+own frame is measured from that cover, hiding it can leave the band without a frame, and then the switch
+goes with it.
+
 ## What is real, and what is not
 
 | Shown | Source | Honest? |
@@ -77,7 +87,7 @@ about a second. It is a drawing, not a simulation; nothing here is fluid dynamic
 | Spectrum, crests | `SGRSpectrum` over `SGAudioSetOutputReader` | yes |
 | Tempo, onsets | `SGMusicAnalyzer` on the same tap | yes |
 | Voice / Rest levels | `Sing`'s separation (Mel-Band RoFormer) | yes, and only two stems |
-| Voice / Rest gains | — | **no**: Sing mixes one level today; the meters show, they do not yet turn |
+| Voice / Rest gains | Sing's level, and the engine's rest gain | yes, both real; put back when the mode leaves |
 | Cover color | the artwork's own pixels | yes |
 | Credits | Spotify's credits card, where present | yes, and absent otherwise |
 | BPM "vibe" words | — | **no**: no mood data exists; show the number, not a mood |

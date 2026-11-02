@@ -91,6 +91,10 @@ BOOL SGSingOn(void);
 void SGSetSingOn(BOOL on);
 float SGSingLevel(void);
 void SGSetSingLevel(float level);
+// Flow's B-Side: the rest of the song's gain while the mode is on, 1 as the song has it and 0 gone. Not
+// stored — it is a player's control, not a setting — and whoever asks puts it back to 1 when it lets go.
+void SGSetSingRest(float rest);
+float SGSingRest(void);
 // The loudness (RMS) of the vocals and of the rest of the song as heard, per tenth of a second, for the `count`
 // tenths up to what plays now, oldest first; NO, and nothing written, unless Sing is turning the vocals down now.
 // Reading them says a page shows them: with the vocals as sung and Spatial voice off, Sing separates only while

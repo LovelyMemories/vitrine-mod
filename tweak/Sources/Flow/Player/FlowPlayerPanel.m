@@ -21,15 +21,18 @@ static const CGFloat kBarHeight = 34;
 static const CGFloat kBarMaxWidth = 260;
 
 NSArray<NSString *> *SGFPlayerModeNames(void) {
-    return @[@"Aura", @"B-Side", @"Synesthesia"];
+    return @[SGLocalized(@"Aura"), @"B-Side", SGLocalized(@"Synesthesia")];
+}
+
+BOOL SGFPlayerHidesVolume(void) {
+    return SGFlowUI();
 }
 
 @interface SGFPlayerPanel : UIView
 // How many times the band has asked to be laid out without the cover having one yet.
 @property (nonatomic) NSInteger attempts;
-// Where Spotify draws the cover, in the panel's coordinates (CGRectNull when it has none): the room Aura
-// may use is only what is under it.
-@property (nonatomic) CGRect coverFrame;
+// The last room the player gave it (CGRectNull before the first): proof that it has a place to keep.
+@property (nonatomic) CGRect area;
 @end
 
 @implementation SGFPlayerPanel {
@@ -40,6 +43,8 @@ NSArray<NSString *> *SGFPlayerModeNames(void) {
     SGFBsideView *_bside;
     NSMutableArray<UIButton *> *_tabs;
     SGFPlayerMode _mode;
+    UIImage *_artwork;
+    NSInteger _restyleTick;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -91,6 +96,7 @@ NSArray<NSString *> *SGFPlayerModeNames(void) {
 }
 
 - (void)paint {
+    [self refreshArtwork];
     for (UIButton *tab in _tabs) {
         BOOL on = tab.tag == (NSInteger)_mode;
         tab.backgroundColor = [UIColor colorWithWhite:1 alpha:on ? 0.22 : 0];
@@ -113,6 +119,8 @@ NSArray<NSString *> *SGFPlayerModeNames(void) {
 - (UIView *)contentForMode:(SGFPlayerMode)mode {
     if (mode == SGFPlayerModeAura) {
         if (!_aura) _aura = [[SGFAuraView alloc] initWithFrame:_content.bounds];
+        // A band made after the artwork was read still shows it.
+        _aura.artwork = _artwork;
         return _aura;
     }
     if (mode == SGFPlayerModeSynesthesia) {
@@ -126,8 +134,39 @@ NSArray<NSString *> *SGFPlayerModeNames(void) {
     return nil;
 }
 
+// The artwork the mod already read, and the wash it gives the band. The panel paints the band itself, so
+// Spotify's own cover and the lyric preview under it are behind Flow's background: nothing Flow draws can
+// land on either.
+- (void)refreshArtwork {
+    UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
+    if (image == _artwork) return;
+    _artwork = image;
+    self.backgroundColor = image ? SGFWashForImage(image) : SGFBlack();
+    _aura.artwork = image;
+}
+
+// Spotify's own progress slider, drawn Flow's way: a thin track, the played part in the cover's light and a
+// small round thumb. It stays Spotify's slider, with its drag, its seeking and its accessibility; only its
+// colors change. Walked every twentieth pass, since the tree is the player's.
+- (void)restyleSlidersIn:(UIView *)host {
+    if (!host || (++_restyleTick % 20)) return;
+    NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:host];
+    while (queue.count) {
+        UIView *view = queue.lastObject;
+        [queue removeLastObject];
+        if ([view isKindOfClass:UISlider.class] && ![view isDescendantOfView:self]) {
+            UISlider *slider = (UISlider *)view;
+            slider.minimumTrackTintColor = SGFAccent();
+            slider.maximumTrackTintColor = [UIColor colorWithWhite:1 alpha:0.16];
+            slider.thumbTintColor = UIColor.whiteColor;
+        }
+        [queue addObjectsFromArray:view.subviews];
+    }
+}
+
 - (void)layoutSubviews {
     [super layoutSubviews];
+    [self refreshArtwork];
     CGFloat width = MIN(CGRectGetWidth(self.bounds) - 32, kBarMaxWidth);
     _bar.frame = CGRectMake((CGRectGetWidth(self.bounds) - width) / 2, 0, width, kBarHeight);
     CGFloat inset = 4, tabWidth = (width - inset * 2) / (CGFloat)_tabs.count;
@@ -139,8 +178,6 @@ NSArray<NSString *> *SGFPlayerModeNames(void) {
     _synesthesia.frame = _content.bounds;
     _bside.frame = _content.bounds;
     _aura.frame = _content.bounds;
-    // Aura may draw only under the cover, so it is told where the cover is, in its own coordinates.
-    if (_aura) _aura.coverFrame = CGRectIsNull(self.coverFrame) ? CGRectNull : [_aura convertRect:self.coverFrame fromView:self];
 }
 
 @end
@@ -162,6 +199,13 @@ void SGFPlayerPanelLayout(UIView *host) {
     CGRect area = SGRPlayerArtworkAreaIn(host);
     // Nothing to draw into: no cover has laid out yet, or the player is closing.
     if (CGRectIsNull(area) || area.size.height < 80) {
+        // Once it has a place, a pass that cannot measure keeps the last one. Hiding the cover for
+        // Synesthesia can leave the band without a frame for a pass, and the panel -- the switch included --
+        // must not blink out with it, or the mode that hid the cover could not be left again.
+        if (!CGRectIsNull(panel.area)) {
+            panel.hidden = NO;
+            return;
+        }
         panel.hidden = YES;
         // The player's first pass can come before the cover has a frame. Ask again a few times rather
         // than wait for a layout that a still player may never get; after that, its own pass will do.
@@ -174,10 +218,9 @@ void SGFPlayerPanelLayout(UIView *host) {
         return;
     }
     panel.attempts = 0;
+    panel.area = area;
     panel.hidden = NO;
     panel.frame = area;
-    // Aura needs the cover's own frame, which is not the band's: the cover sits inside it.
-    CGRect cover = SGRPlayerCoverFrameIn(host);
-    panel.coverFrame = CGRectIsNull(cover) ? CGRectNull : [panel convertRect:cover fromView:host];
     [panel setNeedsLayout];
+    [panel restyleSlidersIn:host];
 }

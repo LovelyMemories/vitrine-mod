@@ -472,6 +472,9 @@ static void watch(void);
 static const CFTimeInterval kLinesGoneAfter = 1;
 static CFAbsoluteTime sg_linesReadAt;
 static BOOL sg_resting;
+// Flow's B-Side, while it is on: the rest of the song's gain beside the vocals' level, 1 as the song has it.
+// Nothing stores it: it lives as long as the player that asked for it, which puts it back when it lets go.
+static float sg_rest = 1;
 
 static BOOL restful(void) {
     BOOL held = sg_hot && !SGHidden(SGKeySingIgnoreHeat) && !standIn();
@@ -489,6 +492,7 @@ static void apply(void) {
             return;
         }
         SGSingEngineSetLevel(engine, SGSingLevel());
+        SGSingEngineSetRestLevel(engine, sg_rest);
         applySpatialSound(engine);
         atomic_store_explicit(&sg_engine, engine, memory_order_release);
     }
@@ -561,8 +565,8 @@ BOOL SGSingReadLevels(float *vocals, float *rest, int count) {
     SGSingEngine *engine = atomic_load(&sg_engine);
     if (!engine || SGSingCurrentState() != SGSingStateSinging) return NO;
     SGSingEngineReadLevels(engine, vocals, rest, count);
-    // As heard: the vocals' gain up to 1, then the rest's down to nothing at 2.
-    float level = SGSingLevel(), vocalsGain = fminf(level, 1), restGain = level <= 1 ? 1 : 2 - level;
+    // As heard: the vocals' gain up to 1, then the rest's down to nothing at 2, scaled by Flow's own rest gain.
+    float level = SGSingLevel(), vocalsGain = fminf(level, 1), restGain = (level <= 1 ? 1 : 2 - level) * sg_rest;
     for (int k = 0; k < count; k++) {
         vocals[k] *= vocalsGain;
         rest[k] *= restGain;
@@ -573,6 +577,17 @@ BOOL SGSingReadLevels(float *vocals, float *rest, int count) {
 float SGSingLevel(void) {
     NSNumber *stored = [NSUserDefaults.standardUserDefaults objectForKey:SGKeySingLevel];
     return stored ? fmaxf(0, fminf(stored.floatValue, 2)) : kDefaultLevel;
+}
+
+// Nothing stores it: it lives as long as the player that asked for it, which puts it back when it lets go.
+float SGSingRest(void) {
+    return sg_rest;
+}
+
+void SGSetSingRest(float rest) {
+    sg_rest = fmaxf(0, fminf(isfinite(rest) ? rest : 1, 1));
+    SGSingEngine *engine = atomic_load(&sg_engine);
+    if (engine) SGSingEngineSetRestLevel(engine, sg_rest);
 }
 
 void SGSetSingLevel(float level) {

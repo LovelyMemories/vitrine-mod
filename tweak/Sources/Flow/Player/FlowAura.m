@@ -1,31 +1,43 @@
-// Flow's Aura mode: the line being sung, and the two around it, in whatever room the cover leaves.
+// Flow's Aura mode: the cover, smaller, and the line being sung under it -- the composition of the Flow
+// mock, drawn by Flow itself.
 //
-// The band the player gives its artwork is mostly cover, and Spotify draws its own lyric preview under
-// it. So Aura never draws over the cover: it takes the cover's frame (Core/SGPlayerGeometry.h) and puts
-// its three lines in the room below it, and where there is none -- the cover filling the band, as it
-// usually does -- it draws nothing at all rather than lie on top of Spotify's preview.
-//
-// The lines are Shared/Lyrics' own (SGKaraokeLinesForTrack, SGKaraokeLeadLine), the same ones the lock
-// screen shows, so Aura adds a reader rather than a second lyrics engine.
+// The band the player gives its artwork is Flow's here: the band's own background is the cover's wash, the
+// smaller cover is drawn from the artwork the mod already reads (Core/SGPlayerGeometry.h), and the lines
+// come from Shared/Lyrics' own (SGKaraokeLeadLine), the same ones the lock screen shows. Spotify's own
+// cover and its lyric preview are simply behind that background, which is why nothing can collide with
+// them.
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 #import "Core/SGCore.h"
+#import "Core/SGPlayerGeometry.h"
 #import "Shared/Lyrics/Lyrics.h"
-#import "Flow/Kit/SGFColor.h"
 #import "FlowAura.h"
 
+static const CGFloat kCoverSide = 240;
+
 @implementation SGFAuraView {
+    UIImageView *_cover;
     UILabel *_before, *_now, *_after;
     NSTimer *_timer;
+    BOOL _fitsBefore, _fitsAfter;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.backgroundColor = UIColor.clearColor;
     self.userInteractionEnabled = NO;
-    _before = [self addLine:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium] color:[UIColor colorWithWhite:1 alpha:0.42]];
-    _after = [self addLine:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium] color:[UIColor colorWithWhite:1 alpha:0.42]];
-    _now = [self addLine:[UIFont systemFontOfSize:17 weight:UIFontWeightSemibold] color:UIColor.whiteColor];
+
+    _cover = [[UIImageView alloc] initWithFrame:CGRectZero];
+    _cover.contentMode = UIViewContentModeScaleAspectFill;
+    _cover.clipsToBounds = YES;
+    _cover.layer.cornerRadius = 14;
+    _cover.layer.cornerCurve = kCACornerCurveContinuous;
+    _cover.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    [self addSubview:_cover];
+
+    _before = [self addLine:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium] color:[UIColor colorWithWhite:1 alpha:0.45]];
+    _after = [self addLine:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium] color:[UIColor colorWithWhite:1 alpha:0.45]];
+    _now = [self addLine:[UIFont systemFontOfSize:16 weight:UIFontWeightSemibold] color:UIColor.whiteColor];
     return self;
 }
 
@@ -33,14 +45,18 @@
     [self end];
 }
 
+- (void)setArtwork:(UIImage *)artwork {
+    if (artwork == _artwork) return;
+    _artwork = artwork;
+    _cover.image = artwork;
+}
+
 - (UILabel *)addLine:(UIFont *)font color:(UIColor *)color {
     UILabel *label = [UILabel new];
     label.font = font;
     label.textColor = color;
     label.textAlignment = NSTextAlignmentCenter;
-    label.numberOfLines = 1;
-    label.adjustsFontSizeToFitWidth = YES;
-    label.minimumScaleFactor = 0.7;
+    label.numberOfLines = 2;
     label.hidden = YES;
     [self addSubview:label];
     return label;
@@ -66,55 +82,53 @@
     _timer = nil;
 }
 
-- (void)setCoverFrame:(CGRect)coverFrame {
-    if (CGRectEqualToRect(_coverFrame, coverFrame)) return;
-    _coverFrame = coverFrame;
-    [self setNeedsLayout];
-}
-
-// The room under the cover, in this view's own coordinates: nothing above the cover, nothing off the end.
-// With no cover frame known there is no room either: drawing at the top of the band would be drawing over
-// the cover, which is the one thing Aura does not do.
-- (CGRect)room {
-    if (CGRectIsNull(_coverFrame)) return CGRectNull;
-    CGFloat top = CGRectGetMaxY(_coverFrame);
-    if (top < 0) top = 0;
-    CGFloat height = CGRectGetHeight(self.bounds) - top;
-    if (height < 44) return CGRectNull;
-    return CGRectMake(0, top, CGRectGetWidth(self.bounds), height);
-}
-
 - (void)tick {
     NSString *track = SGKaraokePlayingTrack();
     NSInteger position = SGKaraokePositionMs();
     NSArray<SGKaraokeLine *> *lines = track && position >= 0 ? SGKaraokeLinesForTrack(track) : nil;
     // The Lyrics page's delay is the same one every reader of these lines applies.
     NSInteger ms = position - SGKaraokeDelayMs();
-    NSInteger lead = lines.count && !CGRectIsNull([self room]) ? SGKaraokeLeadLine(lines, ms) : -1;
+    NSInteger lead = lines.count ? SGKaraokeLeadLine(lines, ms) : -1;
     if (lead < 0) {
         _before.hidden = _now.hidden = _after.hidden = YES;
+        [self setNeedsLayout];
         return;
     }
     _now.text = SGKaraokeLineText(lines[(NSUInteger)lead]);
     _before.text = lead > 0 ? SGKaraokeLineText(lines[(NSUInteger)lead - 1]) : nil;
     _after.text = lead + 1 < (NSInteger)lines.count ? SGKaraokeLineText(lines[(NSUInteger)lead + 1]) : nil;
     _now.hidden = NO;
-    _before.hidden = _before.text.length == 0;
-    _after.hidden = _after.text.length == 0;
+    _before.hidden = !_fitsBefore || _before.text.length == 0;
+    _after.hidden = !_fitsAfter || _after.text.length == 0;
     [self setNeedsLayout];
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGRect room = [self room];
-    if (CGRectIsNull(room)) {
-        _before.hidden = _now.hidden = _after.hidden = YES;
-        return;
+    CGFloat width = CGRectGetWidth(self.bounds), height = CGRectGetHeight(self.bounds);
+    const CGFloat nowHeight = 44, lineHeight = 32, gap = 6, foot = 4;
+
+    // The cover takes what is left once the lines have their room, and never more than the mock's 240pt.
+    CGFloat linesRoom = nowHeight + lineHeight + gap + foot;
+    CGFloat side = MIN(kCoverSide, MIN(width - 40, height - linesRoom - 14));
+    _cover.hidden = side < 96;
+    if (_cover.hidden) side = 0;
+    _cover.frame = CGRectMake((width - side) / 2, 0, side, side);
+
+    CGFloat top = (side > 0 ? side + 14 : 0) + foot;
+    CGFloat room = height - top;
+    _fitsBefore = room >= nowHeight + lineHeight + gap;
+    _fitsAfter = room >= nowHeight + 8;
+    if (_fitsBefore) top += lineHeight + gap;
+
+    _now.frame = CGRectMake(8, top, width - 16, nowHeight);
+    top += nowHeight;
+    if (_fitsAfter) {
+        _after.frame = CGRectMake(8, top + 2, width - 16, lineHeight);
     }
-    CGFloat lineHeight = 18, gap = 6, width = CGRectGetWidth(self.bounds);
-    _now.frame = CGRectMake(0, CGRectGetMinY(room), width, lineHeight + 4);
-    _before.frame = CGRectMake(0, CGRectGetMinY(_now.frame) - lineHeight - gap, width, lineHeight);
-    _after.frame = CGRectMake(0, CGRectGetMaxY(_now.frame) + gap, width, lineHeight);
+    if (_fitsBefore) {
+        _before.frame = CGRectMake(8, CGRectGetMinY(_now.frame) - lineHeight - gap, width - 16, lineHeight);
+    }
 }
 
 @end

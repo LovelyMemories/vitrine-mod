@@ -13,6 +13,7 @@
 #import <math.h>
 #import "Core/SGCore.h"
 #import "Core/SGSpectrum.h"
+#import "Shared/AudioEffects/AudioEffects.h"
 #import "Shared/Player/PlayerState.h"
 #import "Flow/Kit/SGFColor.h"
 #import "FlowWaveform.h"

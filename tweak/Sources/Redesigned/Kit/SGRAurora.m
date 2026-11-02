@@ -83,17 +83,17 @@ static const NSInteger kAuroraCurtains = 6;
 }
 
 static NSArray *curtainColors(UIColor *color) {
-    return @[(id)[color colorWithAlphaComponent:0.95].CGColor,
-             (id)[color colorWithAlphaComponent:0.45].CGColor,
+    return @[(id)[color colorWithAlphaComponent:1].CGColor,
+             (id)[color colorWithAlphaComponent:0.55].CGColor,
              (id)[color colorWithAlphaComponent:0].CGColor];
 }
 
 // The palette keeps a cover's darker ends -- for a field that is right, and on black it is nearly invisible. A
-// curtain is light, so its color is lifted: saturation a little, brightness a lot, never below 0.7.
+// curtain is light, so its color is lifted hard: saturation up, brightness up, and never below 0.85.
 static UIColor *lightOf(UIColor *color) {
     CGFloat h = 0, s = 0, b = 0, a = 1;
-    if (![color getHue:&h saturation:&s brightness:&b alpha:&a]) return [UIColor colorWithWhite:0.92 alpha:1];
-    return [UIColor colorWithHue:h saturation:MIN(1, s * 1.3) brightness:MIN(1, MAX(0.7, b * 1.5)) alpha:1];
+    if (![color getHue:&h saturation:&s brightness:&b alpha:&a]) return [UIColor colorWithWhite:0.95 alpha:1];
+    return [UIColor colorWithHue:h saturation:MIN(1, s * 1.4) brightness:MIN(1, MAX(0.85, b * 1.9)) alpha:1];
 }
 
 - (void)setColors:(NSArray<UIColor *> *)colors animated:(BOOL)animated {
@@ -110,7 +110,7 @@ static UIColor *lightOf(UIColor *color) {
         pair[1].colors = curtainColors(second);
     }
     UIColor *foot = count ? lightOf(colors.firstObject) : [UIColor colorWithWhite:0.9 alpha:1];
-    _horizon.colors = @[(id)[foot colorWithAlphaComponent:0.45].CGColor, (id)[foot colorWithAlphaComponent:0].CGColor];
+    _horizon.colors = @[(id)[foot colorWithAlphaComponent:0.6].CGColor, (id)[foot colorWithAlphaComponent:0].CGColor];
     [CATransaction commit];
     [self setNeedsLayout];
 }

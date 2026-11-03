@@ -83,3 +83,13 @@ TransitionSchedulingPolicy
 - Без анализа план будет грубым — это не AutoMix из Apple Music, а его расписание.
 - Копировать скомпилированный код из чужой подписи нельзя; здесь речь только о повторении
   архитектуры в своём проекте.
+
+## Что уже в репозитории
+
+- `Shared/AutoMix/AutoMix.{h,m}` — загрузчик: `dlopen` нужного варианта, `dlsym("SGAutoMixPlan")`,
+  вызов с тремя JSON и возврат строки. Компилируется обычной сборкой; без хелпера
+  `SGAutoMixAvailable()` отвечает NO и мод ведёт себя как раньше.
+- `tweak/AutoMix/` — черновик Swift-хелпера (`SGAutoMix.swift`), ручной интерфейс SonicKit
+  (`Interface26.swift`), отдельный `Makefile` и `README.md`. **В обычную сборку не входит**:
+  `tweak/Makefile` читает только `tweak/Sources`.
+

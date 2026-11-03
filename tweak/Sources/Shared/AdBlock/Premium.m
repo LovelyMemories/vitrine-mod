@@ -75,6 +75,13 @@ static NSData *patchAttributes(NSData *response) {
     NSMutableArray<SGPBField *> *fields = SGPBParse(response);
     if (!fields) return nil;
     NSDictionary<NSString *, id> *forced = forcedAttributes();
+    // What the account is made to look like, once: a Free-looking state is what leaves the crossfade and AutoMix
+    // rows off the Settings page whatever their own flags say.
+    static BOOL loggedProduct;
+    if (!loggedProduct) {
+        loggedProduct = YES;
+        SGLog(@"premium: product %@, crossfade product state %@", forced[@"type"], forced[@"enable-crossfade-product-state"]);
+    }
     NSMutableArray<SGPBField *> *out = [NSMutableArray array];
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
     for (SGPBField *field in fields) {
@@ -421,16 +428,15 @@ static NSData *patchConfiguration(NSData *configuration) {
             continue;
         }
         NSString *scope = SGPBText(SGPBFirst(parts, 1)) ?: @"", *name = SGPBText(SGPBFirst(parts, 2)) ?: @"";
-        // The core reads this scope while Settings and AutoMix write the older audio.crossfade prefs, so with the
-        // server's flag on every one of their writes misses the store the core reads. Said once, since it is the
-        // first thing to check when a crossfade does nothing.
-        if ([scope isEqualToString:@"playback-settings"] && [name isEqualToString:@"use_playback_settings_crossfade"]) {
-            static BOOL logged;
-            if (!logged) {
-                logged = YES;
-                SGPBField *flag = SGPBFirst(value, 3);
-                SGLog(@"premium: the server sends playback-settings.use_playback_settings_crossfade = %@; forced off so the core reads the prefs Settings writes",
-                      flag ? (flag.payload.length ? @"true" : @"false") : @"absent");
+        // Every playback-settings key the server sends, once each: the crossfade and AutoMix rows of the Settings
+        // page are drawn by these, and a key the client never sends is a row that cannot appear.
+        if ([scope isEqualToString:@"playback-settings"]) {
+            static NSMutableSet<NSString *> *seen;
+            if (!seen) seen = [NSMutableSet set];
+            if (![seen containsObject:name]) {
+                [seen addObject:name];
+                SGPBField *field = SGPBFirst(value, 3);
+                SGLog(@"premium: in playback-settings.%@ = %@", name, field ? (field.payload.length ? @"true" : @"false") : @"absent");
             }
         }
         BOOL removed = NO;
@@ -448,6 +454,11 @@ static NSData *patchConfiguration(NSData *configuration) {
             }
         }
         if (removed) continue;
+        // The two flags the Settings page's crossfade and AutoMix rows hang on, as they leave this side.
+        if ([name isEqualToString:@"crossfade_enabled"] || [name isEqualToString:@"automix_enabled"]) {
+            SGPBField *flag = SGPBFirst(value, 3);
+            SGLog(@"premium: out %@.%@ = %@", scope, name, flag ? (flag.payload.length ? @"true" : @"false") : @"absent");
+        }
         [present addObject:[NSString stringWithFormat:@"%@.%@", scope, name]];
         field.payload = SGPBSerialize(value);
         [out addObject:field];
@@ -455,6 +466,11 @@ static NSData *patchConfiguration(NSData *configuration) {
     for (size_t i = 0; i < ruleCount; i++) {
         if (rules[i].kind != SGRuleForce || !rules[i].scope || !rules[i].name) continue;
         if ([present containsObject:[NSString stringWithFormat:@"%s.%s", rules[i].scope, rules[i].name]]) continue;
+        // A flag the server did not send at all, which this side adds: worth a line for the four that decide the
+        // crossfade and AutoMix rows, since "absent" and "off" can mean different things to the client.
+        if (!strcmp(rules[i].name, "crossfade_enabled") || !strcmp(rules[i].name, "automix_enabled")) {
+            SGLog(@"premium: added %s.%s = %s", rules[i].scope, rules[i].name, rules[i].on ? "true" : "false");
+        }
         NSData *identifier = SGPBSerialize(@[SGPBString(1, @(rules[i].scope)), SGPBString(2, @(rules[i].name))]);
         [out addObject:SGPBBytes(3, SGPBSerialize(@[SGPBBytes(1, identifier), SGPBBytes(3, boolValue(rules[i].on))]))];
     }

@@ -43,11 +43,20 @@ SGRArtworkField *SGRPlayerField(void) {
 
 SGRPlayerBackgroundKind SGRPlayerBackground(void) {
     NSInteger kind = SGInt(SGRKeyPlayerBackground, SGEnabled(SGRKeyPlayerMotion) ? SGRPlayerBackgroundColours : SGRPlayerBackgroundStill);
-    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundAurora ? kind : SGRPlayerBackgroundColours;
+    return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundAuto ? kind : SGRPlayerBackgroundColours;
 }
 
 NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
-    return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualizer", @"Aurora"];
+    return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualizer", @"Aurora", @"Black", @"Auto"];
+}
+
+// What Auto stands for in this track: Animated while the song has a clip to show, the Visualizer while it has
+// none. The clip is only known once PlayerMotion.x has looked it up, which it does for Animated; a track still
+// being looked up is taken as one with a clip, so the player does not flicker from the hills to a clip.
+SGRPlayerBackgroundKind SGRPlayerBackgroundResolved(void) {
+    SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+    if (kind != SGRPlayerBackgroundAuto) return kind;
+    return SGRPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
 }
 
 // A paused song holds the colors still, the way it rests the cover (PlayerArtwork.x), and so does what lies over
@@ -95,11 +104,15 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     if (field) return field;
     field = [[SGRArtworkField alloc] initWithFrame:plane.bounds];
     field.showsBackdrop = YES;
-    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    SGRPlayerBackgroundKind chosen = SGRPlayerBackground();
+    SGRPlayerBackgroundKind background = chosen == SGRPlayerBackgroundAuto ? SGRPlayerBackgroundResolved() : chosen;
     field.flows = background == SGRPlayerBackgroundColours;
     // Fluid is what Animated and the Visualizer show over: they are the picture either way.
     field.fluid = background == SGRPlayerBackgroundFluid || (background >= SGRPlayerBackgroundAnimated && background <= SGRPlayerBackgroundVisualiser);
     field.aurora = background == SGRPlayerBackgroundAurora;
+    // Black: nothing of the field shows, so no color and no backdrop either.
+    field.showsBackdrop = background != SGRPlayerBackgroundBlack;
+    if (background == SGRPlayerBackgroundBlack) [field setProvisionalColor:UIColor.blackColor];
     field.motionHeld = fieldHeld();
     field.bleed = kBleed;
     objc_setAssociatedObject(plane, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);

@@ -46,6 +46,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualizer.",
         @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
         @"The cover's colors as a few soft blobs, drifting and breathing. It rests while a song is paused.",
+        @"Nothing at all: the app's own black, for a screen that saves by it.",
+        @"Whatever the song has: its animated artwork, or the Visualizer while it has none.",
     ];
 }
 
@@ -185,7 +187,9 @@ static NSArray<NSString *> *backgroundNotes(void) {
 // looked up, when this is called: a track changed while the page shows keeps the last one until the page
 // appears again. A clip is looked up only while the card is in a window.
 - (void)reloadBackgroundAnimated:(BOOL)animated {
+    // The card shows what the player will: Auto resolved to the track in it.
     SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+    if (kind == SGRPlayerBackgroundAuto) kind = SGRPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
     __weak SGRPlayerShowcase *weakSelf = self;
     void (^arrived)(void) = !self.window ? nil : ^{
         SGRPlayerShowcase *showcase = weakSelf;
@@ -333,8 +337,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     backgrounds.selectedSegmentIndex = SGRPlayerBackground();
     backgrounds.accessibilityLabel = @"Background";
     backgrounds.apportionsSegmentWidthsByContent = YES;
-    // Seven names in one row: the smaller face is what lets them all fit and stay readable.
-    [backgrounds setTitleTextAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold]}
+    // Nine names in one row: the smaller face is what lets them all fit and stay readable.
+    [backgrounds setTitleTextAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold]}
                                forState:UIControlStateNormal];
 
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
@@ -370,7 +374,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     [sections addObjectsFromArray:more];
     // Fluid, Animated and Visualizer share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m
     // on the field's layout); Still and Colors are a field of another kind, made once a launch (PlayerField.x).
-    NSString *footer = @"Fluid, Animated and Visualizer change with the next song. Still, Colors, Aurora, Cover and Hide on the player apply after you restart Spotify.";
+    NSString *footer = @"Fluid, Animated and Visualizer change with the next song. Still, Colors, Aurora, Black, Auto and Hide on the player apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     weakPage = page;
     page.showcase = showcase;

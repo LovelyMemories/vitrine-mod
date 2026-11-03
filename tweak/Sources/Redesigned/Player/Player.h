@@ -48,9 +48,14 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundAnimated,   // the track's Canvas or Apple Music's animated cover, over Fluid (PlayerMotion.x)
     SGRPlayerBackgroundVisualiser, // a spectrum of the song over Fluid held still (PlayerVisualiser.m)
     SGRPlayerBackgroundAurora,     // the artwork's colors as soft blobs drifting (SGRAurora.h)
+    SGRPlayerBackgroundBlack,      // nothing at all: the app's pure black, for an AMOLED screen
+    SGRPlayerBackgroundAuto,       // Animated while the track has a clip, else the Visualizer (PlayerField.x)
 };
 // The player's ⋯ menu switches between the last three, which share the Fluid field, without a restart.
 SGRPlayerBackgroundKind SGRPlayerBackground(void);
+// Auto as the track actually stands: Animated with a clip to show, the Visualizer without one. Any other
+// choice as it is.
+SGRPlayerBackgroundKind SGRPlayerBackgroundResolved(void);
 // The names of the choices, in order.
 NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 

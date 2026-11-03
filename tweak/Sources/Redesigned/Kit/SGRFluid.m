@@ -29,7 +29,38 @@ static const struct { __unsafe_unretained NSString *key; SGRFluidLimits limits; 
     {@"spotifyglass.redesign.fluid.blur", {2, 24, 1, 8}},
     {@"spotifyglass.redesign.fluid.saturation", {0, 250, 10, 150}},
     {@"spotifyglass.redesign.fluid.brightness", {40, 150, 5, 100}},
+    {@"spotifyglass.redesign.fluid.grain", {0, 100, 5, 0}},
 };
+
+// soft, calm, slow, vivid, bright, fast: the six names from the 1.0.1 build's own preset list.
+static const NSInteger kPresets[][SGRFluidSettingCount] = {
+    /* soft   */ {80, 70, 12, 130, 100, 20},
+    /* calm   */ {60, 60, 16, 120, 95, 10},
+    /* slow   */ {35, 100, 6, 150, 100, 0},
+    /* vivid  */ {120, 100, 6, 250, 105, 10},
+    /* bright */ {100, 80, 8, 160, 140, 0},
+    /* fast   */ {220, 100, 8, 150, 105, 5},
+};
+
+NSArray<NSString *> *SGRFluidPresetNames(void) {
+    return @[@"Soft", @"Calm", @"Slow", @"Vivid", @"Bright", @"Fast"];
+}
+
+NSInteger SGRFluidCurrentPreset(void) {
+    for (NSInteger p = 0; p < SGRFluidPresetCount; p++) {
+        BOOL same = YES;
+        for (NSInteger i = 0; i < SGRFluidSettingCount && same; i++) same = SGRFluidValue((SGRFluidSetting)i) == kPresets[p][i];
+        if (same) return p;
+    }
+    return -1;
+}
+
+void SGRApplyingFluidPreset(SGRFluidPreset preset) {
+    if (preset < 0 || preset >= SGRFluidPresetCount) return;
+    NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    for (NSInteger i = 0; i < SGRFluidSettingCount; i++) [store setInteger:kPresets[preset][i] forKey:kSetting[i].key];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGRFluidSettingsDidChangeNotification object:nil];
+}
 
 SGRFluidLimits SGRFluidLimitsOf(SGRFluidSetting setting) {
     return kSetting[setting].limits;
@@ -104,6 +135,7 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
 @implementation SGRFluidLayer {
     CALayer *_copies[kCopies];
     CAGradientLayer *_shade;
+    CALayer *_grain;
     UIImage *_source;
     NSUInteger _generation;
     BOOL _moving;
@@ -125,6 +157,14 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     _shade = [CAGradientLayer layer];
     _shade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:kShadeAlpha].CGColor];
     [self addSublayer:_shade];
+    // Film grain over the whole of it, as a drawing rather than a shader: a small tile of noise repeated across
+    // the copies, which is what makes a blurred picture read as footage instead of as a smudge.
+    _grain = [CALayer layer];
+    _grain.contentsGravity = kCAGravityResizeAspectFill;
+    _grain.contents = (__bridge id)grainTile().CGImage;
+    _grain.opacity = SGRFluidValue(SGRFluidGrain) / 100.0;
+    _grain.hidden = SGRFluidValue(SGRFluidGrain) <= 0;
+    [self addSublayer:_grain];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(contrastChanged)
         name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
     // Posted on the main thread by the Player page's sliders, so the change applies at once.
@@ -166,6 +206,11 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     _laidOutFor = CGRectNull;
     [self setNeedsLayout];
     if (moving) [self start];
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    _grain.opacity = SGRFluidValue(SGRFluidGrain) / 100.0;
+    _grain.hidden = SGRFluidValue(SGRFluidGrain) <= 0;
+    [CATransaction commit];
     [self reblur];
 }
 
@@ -187,6 +232,7 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _shade.frame = bounds;
+    _grain.frame = bounds;
     _shade.locations = @[@(MIN(1, (CGRectGetMinY(visible) + visible.size.height * kShadeFrom) / total)),
                          @(MIN(1, CGRectGetMaxY(visible) / total))];
     if (!CGRectEqualToRect(visible, _laidOutFor) && visible.size.width >= 1) {
@@ -203,6 +249,46 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
         if (moving) [self start];
     }
     [CATransaction commit];
+}
+
+// One tile of noise, made once: mid gray with its pixels pulled at random, which at full opacity is grain and at
+// a share of it is texture. Blended over the copies as `multiply` would darken; over it as it is, mid gray dims,
+// so the tile is drawn half transparent and only its highlights and pits show.
+static UIImage *grainTile(void) {
+    static UIImage *tile;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        enum { kSide = 96 };
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(kSide, kSide)
+                                                                                format:[[UIGraphicsImageRendererFormat alloc] init]];
+        renderer.format.opaque = NO;
+        tile = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+            unsigned char *pixels = calloc((size_t)kSide * kSide * 4, 1);
+            if (!pixels) return;
+            uint32_t seed = 0x9E3779B9u;
+            for (size_t i = 0; i < (size_t)kSide * kSide; i++) {
+                // xorshift: cheap, and the grain need not be good, only unpatterned.
+                seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+                int value = (int)(seed & 0xFF);
+                pixels[i * 4 + 0] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = (unsigned char)value;
+                pixels[i * 4 + 3] = 40;   // a whisper of alpha: the tile is texture, not a gray wash
+            }
+            CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+            CGContextRef bitmap = CGBitmapContextCreate(pixels, kSide, kSide, 8, kSide * 4, space,
+                                                        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+            CGColorSpaceRelease(space);
+            if (bitmap) {
+                CGImageRef image = CGBitmapContextCreateImage(bitmap);
+                if (image) {
+                    CGContextDrawImage(context.CGContext, CGRectMake(0, 0, kSide, kSide), image);
+                    CGImageRelease(image);
+                }
+                CGContextRelease(bitmap);
+            }
+            free(pixels);
+        }];
+    });
+    return tile;
 }
 
 - (void)setArtwork:(UIImage *)image animated:(BOOL)animated {

@@ -352,9 +352,20 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
     });
     reset.color = SGRed();
+    // The looks by name, above the sliders: picking one lays its six settings over everything at once, and the
+    // sliders below then show what it set, so a look can be nudged from there.
+    SGModRow *presets = SGMenuRow(@"Look", SGRFluidPresetNames(), ^NSString *{
+        NSInteger preset = SGRFluidCurrentPreset();
+        return preset >= 0 ? SGRFluidPresetNames()[(NSUInteger)preset] : @"Custom";
+    }, ^(NSInteger index) {
+        SGRApplyingFluidPreset((SGRFluidPreset)index);
+        [weakPage.tableView reloadData];
+    });
     NSArray<SGModRow *> *fluid = @[
+        presets,
         fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
-        fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"), reset,
+        fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"),
+        fluidSlider(@"Grain", SGRFluidGrain, @"%"), reset,
     ];
     for (SGModRow *row in fluid) row.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFluid; };
 

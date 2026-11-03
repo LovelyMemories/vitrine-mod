@@ -18,6 +18,7 @@ typedef NS_ENUM(NSInteger, SGRFluidSetting) {
     SGRFluidBlur,         // the blur's strength, 1.25 px of radius each on the 128 px cover
     SGRFluidSaturation,   // percent
     SGRFluidBrightness,   // percent, under the ceiling that keeps the player's text legible
+    SGRFluidGrain,        // percent of the film grain laid over it, 0 for none
     SGRFluidSettingCount,
 };
 typedef struct { NSInteger least, most, step, standard; } SGRFluidLimits;
@@ -25,8 +26,19 @@ SGRFluidLimits SGRFluidLimitsOf(SGRFluidSetting setting);
 NSInteger SGRFluidValue(SGRFluidSetting setting);   // held to its limits
 // Stores the value and posts SGRFluidSettingsDidChangeNotification on the main thread.
 void SGRSetFluidValue(SGRFluidSetting setting, NSInteger value);
-void SGRResetFluidSettings(void);   // all five back to their standard values, one notification
+void SGRResetFluidSettings(void);   // every setting back to its standard value, one notification
 extern NSNotificationName const SGRFluidSettingsDidChangeNotification;
+
+// The looks a person picks by name instead of moving six sliders: soft, calm, slow, vivid, bright, fast. Each is
+// a set of the settings above, laid over all six at once.
+typedef NS_ENUM(NSInteger, SGRFluidPreset) {
+    SGRFluidPresetSoft, SGRFluidPresetCalm, SGRFluidPresetSlow, SGRFluidPresetVivid, SGRFluidPresetBright,
+    SGRFluidPresetFast, SGRFluidPresetCount,
+};
+NSArray<NSString *> *SGRFluidPresetNames(void);
+// Which preset the settings stand for now, or -1 when they match none of them (the sliders were moved by hand).
+NSInteger SGRFluidCurrentPreset(void);
+void SGRApplyingFluidPreset(SGRFluidPreset preset);
 
 @interface SGRFluidLayer : CALayer
 // The cover, blurred off the main thread and crossfaded in. The same image again is a no-op.

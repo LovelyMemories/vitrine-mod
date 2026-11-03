@@ -25,7 +25,7 @@ static NSString *const kFirstShelf = @"First shelf";
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.userInteractionEnabled = NO;
-    self.backgroundColor = SGRCardBackground();
+    self.backgroundColor = SGCardBackground();
     self.clipsToBounds = YES;
     self.layer.cornerRadius = 22;
     self.layer.cornerCurve = kCACornerCurveContinuous;

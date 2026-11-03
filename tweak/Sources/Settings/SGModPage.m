@@ -1,6 +1,7 @@
 #import <CoreText/SFNTLayoutTypes.h>
 #import "SGModPage.h"
 #import "SGPageStyle.h"
+#import "SGPageTitle.h"
 #import "SGGlowSwitch.h"
 #import "Core/SGCore.h"
 
@@ -767,6 +768,9 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // The large title and its close are put on once the page is in its bar, so a page that comes back from a
+    // pushed one keeps them.
+    SGPageShowLargeTitle(self);
     // A strip of pictures, the first thing on the page: a card of its own above the rows, with the page's intro
     // under it, so both read as one header.
     if (self.iconStrip && !self.iconStrip.superview) {

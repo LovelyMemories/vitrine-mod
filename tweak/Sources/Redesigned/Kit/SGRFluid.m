@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "SGRFluid.h"
 #import "SGRTokens.h"
+#import "SGShader.h"
 
 // Each copy: its side as a share of the visible rect's longer side, its center as shares of that rect, and
 // one turn's length in seconds (negative turns the other way).

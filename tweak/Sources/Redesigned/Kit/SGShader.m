@@ -217,6 +217,9 @@ typedef struct {
     float levels[SG_BANDS];
 } SGHillsUniforms;
 
+@interface SGHillsView () <MTKViewDelegate>
+@end
+
 @implementation SGHillsView {
     id<MTLRenderPipelineState> _pipeline;
     NSTimer *_timer;

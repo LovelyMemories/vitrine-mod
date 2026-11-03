@@ -76,3 +76,21 @@ NSString *SGAutoMixPlanForSongs(NSDictionary *outgoing, NSDictionary *incoming, 
     free(answer);
     return text;
 }
+
+NSDictionary<NSString *, NSString *> *SGAutoMixCuePoints(NSString *uri, double duration,
+                                                         double fadeOutStart, double fadeInEnd) {
+    if (!uri.length || !(duration > 0)) return @{};
+    fadeOutStart = fmax(0, fmin(fadeOutStart, duration));
+    fadeInEnd = fmax(0, fmin(fadeInEnd, duration));
+    return @{
+        @"automix.fade_out_cuepoint.position": [NSString stringWithFormat:@"%.3f", fadeOutStart],
+        @"automix.fade_out_cuepoint.origin": [NSString stringWithFormat:@"%.3f", duration],
+        @"automix.fade_out_cuepoint.tempo": @"1",
+        @"automix.fade_in_cuepoint.position": [NSString stringWithFormat:@"%.3f", fadeInEnd],
+        @"automix.fade_in_cuepoint.origin": @"0",
+        @"automix.fade_in_cuepoint.tempo": @"1",
+        // A recipe of its own, so the two cue points read as one transition rather than as two stray numbers.
+        @"automix.auto_transition_recipe": @"vitrine",
+        @"automix.playable_uri": uri,
+    };
+}

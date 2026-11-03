@@ -259,9 +259,9 @@ static UIImage *grainTile(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         enum { kSide = 96 };
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(kSide, kSide)
-                                                                                format:[[UIGraphicsImageRendererFormat alloc] init]];
-        renderer.format.opaque = NO;
+        UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+        format.opaque = NO;
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(kSide, kSide) format:format];
         tile = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
             unsigned char *pixels = calloc((size_t)kSide * kSide * 4, 1);
             if (!pixels) return;

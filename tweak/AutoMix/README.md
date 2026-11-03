@@ -34,7 +34,9 @@ Known, from the symbols in the 1.0.1 build (docs/automix-sonickit.md):
 
 - the entry point is `SGAutoMixPlan(const char *, const char *, const char *) -> char *`;
 - it calls `TransitionPlanner.transition(from:to:criterias:)` and hands back a textual dump;
-- two variants exist because iOS 26 moved the framework to `_SonicKit_MusicKit_Packages`.
+- two variants exist because iOS 26 moved the framework to `_SonicKit_MusicKit_Packages`;
+- `Transition` is **Encodable** (`…VSEAAMc`) and `Song.Analysis` is **Decodable** (`…OSeAAMc`), so the plan is
+  JSON and an analysis can be handed to the planner as JSON.
 
 Not known:
 

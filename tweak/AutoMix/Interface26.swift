@@ -27,7 +27,9 @@ public struct TransitionPlanner {
             public init(_ rawValue: String) { self.rawValue = rawValue }
         }
         public struct Context {}
-        public enum Analysis {}
+        // `…AnalysisOSeAAMc`: the analysis is Decodable, so it can be fed to the planner as JSON from this side
+        // once its shape is known.
+        public enum Analysis: Decodable {}
 
         public let id: ID
         public let duration: Double?
@@ -60,10 +62,14 @@ public struct TransitionPlanner {
     }
 }
 
-public struct Transition {
+// `…TransitionVSEAAMc`: Encodable, so the plan is JSON rather than a printed dump.
+public struct Transition: Encodable {
     public enum Complexity {}
     public struct DSPGraph {}
     public struct SongPlaybackState {}
     public struct TimeStretchingState {}
     public enum SchedulingPolicy {}
 }
+
+// `…StretchedSongTimeVMn`: a value type of its own, named in the symbols and worth declaring when it is needed.
+public struct StretchedSongTime {}

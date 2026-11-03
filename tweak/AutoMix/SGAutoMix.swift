@@ -40,16 +40,25 @@ private func song(fromJSON pointer: UnsafePointer<CChar>) -> TransitionPlanner.S
     let data = Data(bytes: pointer, count: strlen(pointer))
     guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
     guard let identifier = object["id"] as? String, let duration = object["duration"] as? Double else { return nil }
-    // TODO: the analysis the planner wants, once its shape is known. nil is accepted and plans blind.
+    // The analysis is Decodable (`…AnalysisOSeAAMc`): handed over as JSON under "analysis", it is read here.
+    // TODO: the shape of that JSON, once a real analysis exists to send.
+    var analysis: TransitionPlanner.Song.Analysis?
+    if let payload = object["analysis"],
+       let bytes = try? JSONSerialization.data(withJSONObject: payload) {
+        analysis = try? JSONDecoder().decode(TransitionPlanner.Song.Analysis.self, from: bytes)
+    }
     return TransitionPlanner.Song(id: TransitionPlanner.Song.ID(identifier),
                                   duration: duration,
-                                  analysis: nil,
+                                  analysis: analysis,
                                   context: nil)
 }
 
-/// The planner's answer as text for the tweak. `dump` is what the 1.0.1 build appears to return as well; if the
-/// real type is Encodable, `JSONEncoder` is the cleaner way and should replace this.
+/// The planner's answer as JSON for the tweak. The framework marks `Transition` Encodable (`…VSEAAMc`), so this
+/// is the real encoding; `dump` is kept as the fallback for the day the conformance is not the one guessed here.
 private func text(of transition: Transition) -> String {
+    if let data = try? JSONEncoder().encode(transition), let json = String(data: data, encoding: .utf8) {
+        return json
+    }
     var out = ""
     dump(transition, to: &out)
     return out

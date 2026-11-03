@@ -8,6 +8,7 @@
 // Threading: main thread only. Compiling happens once.
 #import <UIKit/UIKit.h>
 #import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
 
 @interface SGShaderLibrary : NSObject
 // The device's library and queue, or nil on a device without Metal (none this mod runs on, but the fallback is
@@ -18,4 +19,13 @@ NSArray<NSString *> *SGShaderWhy(void);
 @property (nonatomic, readonly) id<MTLDevice> device;
 @property (nonatomic, readonly) id<MTLCommandQueue> queue;
 @property (nonatomic, readonly) id<MTLLibrary> library;
+@end
+
+// Grain as the shader draws it, over whatever is under it: the Metal answer to the tile SGRFluid lays down. It is
+// a view rather than a layer so it can be put over any background without touching it, and it draws nothing at
+// all -- not even a frame -- while it is invisible, out of a window, or `amount` is 0.
+@interface SGGrainView : MTKView
+// 0 to 1. Where the shader library is missing, this view answers +metalGrainAvailable NO and never appears.
+@property (nonatomic) CGFloat amount;
++ (BOOL)metalGrainAvailable;
 @end

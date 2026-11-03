@@ -136,6 +136,7 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     CALayer *_copies[kCopies];
     CAGradientLayer *_shade;
     CALayer *_grain;
+    SGGrainView *_metalGrain;
     UIImage *_source;
     NSUInteger _generation;
     BOOL _moving;
@@ -157,14 +158,22 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     _shade = [CAGradientLayer layer];
     _shade.colors = @[(id)[UIColor colorWithWhite:0 alpha:0].CGColor, (id)[UIColor colorWithWhite:0 alpha:kShadeAlpha].CGColor];
     [self addSublayer:_shade];
-    // Film grain over the whole of it, as a drawing rather than a shader: a small tile of noise repeated across
-    // the copies, which is what makes a blurred picture read as footage instead of as a smudge.
-    _grain = [CALayer layer];
-    _grain.contentsGravity = kCAGravityResizeAspectFill;
-    _grain.contents = (__bridge id)grainTile().CGImage;
-    _grain.opacity = SGRFluidValue(SGRFluidGrain) / 100.0;
-    _grain.hidden = SGRFluidValue(SGRFluidGrain) <= 0;
-    [self addSublayer:_grain];
+    // Film grain over the whole of it. The Metal view when that library is in (SGShader.h): noise a frame at a
+    // time, which is what makes a blurred picture read as footage. The tile is the fallback for a device whose
+    // shaders did not come up, so Fluid never loses its grain altogether.
+    if ([SGGrainView metalGrainAvailable]) {
+        _metalGrain = [[SGGrainView alloc] initWithFrame:CGRectZero];
+    }
+    if (_metalGrain) {
+        _metalGrain.amount = SGRFluidValue(SGRFluidGrain) / 100.0;
+    } else {
+        _grain = [CALayer layer];
+        _grain.contentsGravity = kCAGravityResizeAspectFill;
+        _grain.contents = (__bridge id)grainTile().CGImage;
+        _grain.opacity = SGRFluidValue(SGRFluidGrain) / 100.0;
+        _grain.hidden = SGRFluidValue(SGRFluidGrain) <= 0;
+        [self addSublayer:_grain];
+    }
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(contrastChanged)
         name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
     // Posted on the main thread by the Player page's sliders, so the change applies at once.
@@ -210,6 +219,7 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     [CATransaction setDisableActions:YES];
     _grain.opacity = SGRFluidValue(SGRFluidGrain) / 100.0;
     _grain.hidden = SGRFluidValue(SGRFluidGrain) <= 0;
+    _metalGrain.amount = SGRFluidValue(SGRFluidGrain) / 100.0;
     [CATransaction commit];
     [self reblur];
 }
@@ -233,6 +243,7 @@ static UIImage *blurred(UIImage *image, BOOL contrast, CGFloat radius, CGFloat s
     [CATransaction setDisableActions:YES];
     _shade.frame = bounds;
     _grain.frame = bounds;
+    _metalGrain.frame = visible;
     _shade.locations = @[@(MIN(1, (CGRectGetMinY(visible) + visible.size.height * kShadeFrom) / total)),
                          @(MIN(1, CGRectGetMaxY(visible) / total))];
     if (!CGRectEqualToRect(visible, _laidOutFor) && visible.size.width >= 1) {

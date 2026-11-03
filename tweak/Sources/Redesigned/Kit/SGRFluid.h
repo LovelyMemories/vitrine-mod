@@ -36,6 +36,8 @@ typedef NS_ENUM(NSInteger, SGRFluidPreset) {
     SGRFluidPresetFast, SGRFluidPresetCount,
 };
 NSArray<NSString *> *SGRFluidPresetNames(void);
+// One setting as a preset has it, without applying anything: what a card of the preset draws with.
+NSInteger SGRFluidPresetValueAt(NSInteger preset, SGRFluidSetting setting);
 // Which preset the settings stand for now, or -1 when they match none of them (the sliders were moved by hand).
 NSInteger SGRFluidCurrentPreset(void);
 void SGRApplyingFluidPreset(SGRFluidPreset preset);

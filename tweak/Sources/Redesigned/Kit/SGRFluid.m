@@ -47,6 +47,11 @@ NSArray<NSString *> *SGRFluidPresetNames(void) {
     return @[@"Soft", @"Calm", @"Slow", @"Vivid", @"Bright", @"Fast"];
 }
 
+NSInteger SGRFluidPresetValueAt(NSInteger preset, SGRFluidSetting setting) {
+    if (preset < 0 || preset >= SGRFluidPresetCount || setting < 0 || setting >= SGRFluidSettingCount) return 0;
+    return kPresets[preset][setting];
+}
+
 NSInteger SGRFluidCurrentPreset(void) {
     for (NSInteger p = 0; p < SGRFluidPresetCount; p++) {
         BOOL same = YES;

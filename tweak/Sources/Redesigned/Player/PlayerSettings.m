@@ -31,6 +31,7 @@
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
 #import "Player.h"
+#import "PlayerPresetStrip.h"
 
 // The card's height as a share of its width, kept between the two bounds.
 static const CGFloat kCardAspect = 0.5, kCardMinHeight = 168, kCardMaxHeight = 220;
@@ -248,6 +249,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 @interface SGRPlayerPage : SGModPage
 @property (nonatomic, strong) SGRPlayerShowcase *showcase;
 @property (nonatomic, strong) UISegmentedControl *backgrounds;
+@property (nonatomic, strong) SGRFluidPresetStrip *presets;
 @end
 
 @implementation SGRPlayerPage {
@@ -265,6 +267,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _note.textColor = SGGrey();
     _note.numberOfLines = 0;
     [_header addSubview:_note];
+    if (self.presets) [_header addSubview:self.presets];
     [self showNote];
     self.tableView.tableHeaderView = _header;
 }
@@ -299,7 +302,16 @@ static NSArray<NSString *> *backgroundNotes(void) {
     CGFloat noteHeight = ceil([_note sizeThatFits:CGSizeMake(noteWidth, CGFLOAT_MAX)].height);
     CGFloat noteTop = CGRectGetMaxY(self.backgrounds.frame) + 8;
     _note.frame = CGRectMake(inset + 4, noteTop, noteWidth, noteHeight);
-    CGSize size = CGSizeMake(width, noteTop + room);
+    CGFloat bottom = noteTop + room;
+    // The looks are a card of their own under the note, and only while the field is the Fluid one.
+    self.presets.hidden = SGRPlayerBackground() != SGRPlayerBackgroundFluid;
+    if (!self.presets.hidden) {
+        CGSize want = self.presets.intrinsicContentSize;
+        CGFloat stripWidth = MIN(cardWidth, want.width), stripHeight = want.height;
+        self.presets.frame = CGRectMake(inset, bottom + 6, stripWidth, stripHeight);
+        bottom = CGRectGetMaxY(self.presets.frame);
+    }
+    CGSize size = CGSizeMake(width, bottom);
     if (CGSizeEqualToSize(_header.bounds.size, size)) return;
     _header.frame = (CGRect){CGPointZero, size};
     table.tableHeaderView = _header;
@@ -352,17 +364,15 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
     });
     reset.color = SGRed();
-    // The looks by name, above the sliders: picking one lays its six settings over everything at once, and the
+    // The looks as cards, above the sliders: picking one lays its six settings over everything at once, and the
     // sliders below then show what it set, so a look can be nudged from there.
-    SGModRow *presets = SGMenuRow(@"Look", SGRFluidPresetNames(), ^NSString *{
-        NSInteger preset = SGRFluidCurrentPreset();
-        return preset >= 0 ? SGRFluidPresetNames()[(NSUInteger)preset] : @"Custom";
-    }, ^(NSInteger index) {
+    __block SGRFluidPresetStrip *strip = nil;
+    strip = [[SGRFluidPresetStrip alloc] initWithFrame:CGRectMake(0, 0, 320, 152) names:SGRFluidPresetNames()
+                                               picked:^(NSInteger index) {
         SGRApplyingFluidPreset((SGRFluidPreset)index);
         [weakPage.tableView reloadData];
-    });
+    }];
     NSArray<SGModRow *> *fluid = @[
-        presets,
         fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
         fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"),
         fluidSlider(@"Grain", SGRFluidGrain, @"%"), reset,
@@ -389,6 +399,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     weakPage = page;
     page.showcase = showcase;
+    page.presets = strip;
     page.backgrounds = backgrounds;
     [backgrounds addTarget:page action:@selector(backgroundPicked) forControlEvents:UIControlEventValueChanged];
     return page;

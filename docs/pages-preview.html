@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vitrine — страницы мода, вид</title>
+<style>
+  :root {
+    --black: #000;
+    --card: #1c1c1e;
+    --hair: rgba(255,255,255,.10);
+    --grey: rgba(255,255,255,.45);
+    --accent: #e0263a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: #0d0d10; color: #fff;
+    font: 400 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 40px; padding: 28px;
+  }
+
+  /* ---------- телефон ---------- */
+  .phone {
+    position: relative; width: 390px; height: 780px; flex: 0 0 auto;
+    border-radius: 52px; border: 8px solid #1b1b20; background: var(--black);
+    box-shadow: 0 40px 120px rgba(0,0,0,.8), 0 0 0 1px #2a2a31; overflow: hidden;
+  }
+  .screen { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 40px; }
+  .screen::-webkit-scrollbar { width: 3px; }
+  .screen::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 3px; }
+
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 14px 26px 2px; font-size: 13px; font-weight: 600;
+  }
+
+  /* крупный заголовок как теперь в твике */
+  .navrow {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 20px 10px; position: sticky; top: 0; z-index: 5;
+    background: var(--black);
+  }
+  .navrow .top {
+    font-size: 34px; font-weight: 700; letter-spacing: -.6px;
+  }
+  .close {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,.12); display: grid; place-items: center;
+    font-size: 15px; color: #fff; cursor: pointer;
+  }
+
+  /* карточки секций */
+  .card {
+    background: var(--card); border-radius: 22px; margin: 0 16px 22px; overflow: hidden;
+  }
+  .row {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 48px;
+    border-top: 1px solid var(--hair); font-size: 17px;
+  }
+  .row:first-child { border-top: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .sub { font-size: 12px; color: var(--grey); margin-top: 2px; }
+  .row .value { color: var(--grey); font-size: 17px; }
+  .chev { color: rgba(255,255,255,.3); font-size: 15px; }
+  .info {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.45);
+    display: grid; place-items: center; font-size: 12px; color: rgba(255,255,255,.7);
+  }
+  .switch {
+    width: 51px; height: 31px; border-radius: 16px; background: var(--accent);
+    position: relative; flex: 0 0 auto;
+  }
+  .switch.off { background: #39393d; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px;
+    border-radius: 50%; background: #fff; transition: transform .2s;
+  }
+  .switch.on::after { transform: translateX(20px); }
+  .tile {
+    width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center;
+    font-size: 14px; flex: 0 0 auto;
+  }
+  .avatar {
+    width: 29px; height: 29px; border-radius: 50%; flex: 0 0 auto;
+    background: linear-gradient(140deg, #7a8fa8, #3b4d61);
+  }
+
+  /* полоса иконок (Appearance) */
+  .strip { padding: 14px 16px 6px; }
+  .strip .run { display: flex; gap: 12px; }
+  .icon-cell { width: 60px; text-align: center; }
+  .icon-cell .pic {
+    width: 60px; height: 60px; border-radius: 14px; overflow: hidden;
+    display: grid; place-items: center; font-size: 26px;
+    background: linear-gradient(160deg, #1db954, #0d7a35);
+  }
+  .icon-cell.on .pic { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .icon-cell.grey .pic { background: #2b2b30; }
+  .icon-cell.blue .pic { background: linear-gradient(160deg, #2c6fed, #12327a); }
+  .icon-cell.pink .pic { background: linear-gradient(160deg, #ff4fa3, #8a1155); }
+  .icon-cell.paper .pic { background: linear-gradient(160deg, #f2ece2, #c9bfae); color: #222; }
+  .icon-cell .name {
+    font-size: 10px; color: rgba(255,255,255,.6); margin-top: 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .icon-cell.on .name { color: #fff; }
+
+  /* карточка-превью */
+  .preview {
+    height: 190px; border-radius: 22px; margin: 0 16px 16px; position: relative; overflow: hidden;
+    background: linear-gradient(150deg, #5a1f8f, #8a2f8f 45%, #3a2470);
+  }
+  .preview .grabber {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.35);
+  }
+  .preview .art {
+    position: absolute; top: 42px; left: 50%; transform: translateX(-50%);
+    width: 92px; height: 92px; border-radius: 8px;
+    background: linear-gradient(150deg, #d9a35f, #8b4a3a 60%, #3a2a44);
+  }
+  .preview .lines { position: absolute; left: 20px; right: 20px; bottom: 16px; }
+  .preview .t { font-size: 20px; font-weight: 700; }
+  .preview .a { font-size: 13px; color: rgba(255,255,255,.6); }
+  .preview .bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); margin-top: 10px; }
+  .preview .bar i { display: block; height: 100%; width: 42%; border-radius: 2px; background: #fff; }
+
+  /* ряд пресетов */
+  .presets { display: flex; gap: 10px; padding: 0 16px 14px; overflow-x: auto; }
+  .preset { width: 74px; flex: 0 0 auto; text-align: center; }
+  .preset .sw {
+    height: 102px; border-radius: 12px; overflow: hidden;
+  }
+  .preset.on .sw { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 14px; }
+  .preset .n { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 6px; }
+  .preset.on .n { color: #fff; }
+
+  /* сегмент */
+  .seg {
+    margin: 0 16px 10px; display: flex; background: rgba(255,255,255,.1); border-radius: 9px; padding: 2px;
+  }
+  .seg span {
+    flex: 1; text-align: center; font-size: 11px; font-weight: 600; padding: 6px 0; border-radius: 7px;
+    color: rgba(255,255,255,.7);
+  }
+  .seg span.on { background: rgba(255,255,255,.25); color: #fff; }
+
+  .note { font-size: 12px; color: var(--grey); padding: 0 20px 16px; }
+
+  /* ---------- панель ---------- */
+  .panel { width: 320px; flex: 0 0 auto; }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; }
+  .panel .sub { margin: 0 0 16px; font-size: 12px; color: rgba(255,255,255,.45); }
+  .seg-btn { display: flex; gap: 6px; margin-bottom: 18px; }
+  .seg-btn button {
+    flex: 1; padding: 8px 6px; border-radius: 10px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+    color: rgba(255,255,255,.65); font: 600 12px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .seg-btn button[aria-pressed="true"] { background: rgba(255,255,255,.16); color: #fff; }
+  h3 { margin: 18px 0 8px; font-size: 11px; letter-spacing: .7px; text-transform: uppercase; color: rgba(255,255,255,.38); }
+  ul { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.6; color: rgba(255,255,255,.62); }
+  li { margin-bottom: 5px; }
+  .warn { color: hsl(38 90% 65%); }
+
+  @media (max-width: 980px) { body { flex-direction: column; padding: 18px; } .panel { width: 390px; max-width: 100%; } }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen" id="screen">
+    <div class="statusbar"><span>02:21</span><span>▮▮▮ 63</span></div>
+    <div class="navrow">
+      <div class="top" id="title">Appearance</div>
+      <div class="close" role="button" aria-label="Закрыть">✕</div>
+    </div>
+    <div id="body"></div>
+  </div>
+</div>
+
+<aside class="panel">
+  <h2>Страницы мода</h2>
+  <p class="sub">Что получилось после правок — и чего в твике пока нет.</p>
+
+  <div class="seg-btn" role="group">
+    <button data-page="appearance" aria-pressed="true">Appearance</button>
+    <button data-page="player" aria-pressed="false">Player</button>
+    <button data-page="albums" aria-pressed="false">Albums</button>
+  </div>
+
+  <h3>Что здесь как в твике</h3>
+  <ul>
+    <li><b>Крупный заголовок</b> 34 pt слева и круглая <b>×</b> справа — новый <code>SGPageTitle.m</code></li>
+    <li><b>Карточки</b> на чёрном, скругление 22, волосяная линия между строками</li>
+    <li><b>Полоса иконок</b> с кольцом на выбранной, <b>Chroma исключена</b></li>
+    <li><b>Карточки пресетов</b> Fluid: Soft · Calm · Slow · Vivid · Bright · Fast</li>
+    <li><b>Карточка альбома</b> с обложкой и полкой «More by the artist»</li>
+  </ul>
+
+  <h3>Чего в твике нет</h3>
+  <ul>
+    <li class="warn"><b>Выезд справа</b> с просвечивающей Home: у нас Mod Settings пушится в навигацию Spotify, а не открывается модальным листом.</li>
+    <li class="warn"><b>ⓘ у строк</b> и плашка <b>«N changes need a restart»</b>: это отдельная механика подсчёта изменений.</li>
+    <li>Секция профиля с «Add account» и «Сообщения» — это экран Spotify, не мода.</li>
+  </ul>
+</aside>
+
+<script>
+const ICONS = [
+  { cls: "on",  glyph: "◉", name: "Liquid…" },
+  { cls: "blue", glyph: "◍", name: "Arcs" },
+  { cls: "grey", glyph: "◉", name: "Glass" },
+  { cls: "pink", glyph: "◕", name: "Pink" },
+  { cls: "paper", glyph: "◉", name: "Paper" },
+  { cls: "grey", glyph: "◉", name: "Vinyl" },
+];
+
+const PAGES = {
+  appearance: `
+    <div class="card">
+      <div class="strip"><div class="run">
+        ${ICONS.map(i => `<div class="icon-cell ${i.cls}"><div class="pic">${i.glyph}</div><div class="name">${i.name}</div></div>`).join("")}
+      </div></div>
+      <div class="row">
+        <div class="grow">All icons</div><div class="value">30</div><div class="chev">›</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="tile" style="background:#e0263a">◐</div><div class="grow">Automatic accent color</div><div class="info">i</div><div class="switch on"></div></div>
+      <div class="row"><div class="tile" style="background:#3a3a3f">Aa</div><div class="grow">Font</div><div class="value">SF Mono</div><div class="chev">›</div></div>
+    </div>
+    <div class="note">Changes apply after you restart Spotify.</div>
+  `,
+  player: `
+    <div class="preview">
+      <div class="grabber"></div>
+      <div class="art"></div>
+      <div class="lines">
+        <div class="t">Flashing Lights</div>
+        <div class="a">Kanye West</div>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+    <div class="seg">
+      <span>Still</span><span>Colors</span><span class="on">Fluid</span><span>Animated</span>
+    </div>
+    <div class="seg">
+      <span>Visualizer</span><span>Aurora</span><span>Black</span><span>Auto</span>
+    </div>
+    <div class="presets">
+      ${[["Soft","linear-gradient(150deg,#2f4bd0,#c0448a 60%,#e07a36)"],
+         ["Calm","linear-gradient(150deg,#3a4a86,#8a4a80)"],
+         ["Slow","linear-gradient(150deg,#2a3a5a,#7a5a4a)"],
+         ["Vivid","linear-gradient(150deg,#1f5cff,#ff2f8a 55%,#ffa030)"],
+         ["Bright","linear-gradient(150deg,#5a7cff,#ff7ab8)"],
+         ["Fast","linear-gradient(150deg,#2a4aff,#c02aff)"]]
+        .map(([n, g], i) => `<div class="preset ${i === 0 ? "on" : ""}"><div class="sw" style="background:${g}"></div><div class="n">${n}</div></div>`).join("")}
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow">Follow the cover</div><div class="switch on"></div></div>
+      <div class="row"><div class="grow">Only the music</div><div class="switch off"></div></div>
+    </div>
+  `,
+  albums: `
+    <div class="preview" style="height:210px;background:#1c1c1e">
+      <div style="position:absolute;inset:10px;border-radius:18px;background:linear-gradient(150deg,#274a78,#1a2233);"></div>
+      <div style="position:absolute;left:26px;top:26px;width:92px;height:92px;border-radius:8px;background:linear-gradient(150deg,#8a8a90,#4b4b52)"></div>
+      <div style="position:absolute;left:134px;top:32px;font-size:11px;color:rgba(255,255,255,.6);line-height:1.5">June 28, 2024<br>9 songs · 32 min</div>
+      <div style="position:absolute;left:26px;right:26px;top:132px;font-size:17px;font-weight:700">More by the artist</div>
+      <div style="position:absolute;left:26px;top:160px;display:flex;gap:12px">
+        <div style="width:78px;height:44px;border-radius:8px;background:#8a8a90"></div>
+        <div style="width:78px;height:44px;border-radius:8px;background:#2f6fa8"></div>
+        <div style="width:78px;height:44px;border-radius:8px;background:#d08b3e"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow">Animated covers</div><div class="info">i</div><div class="switch on"></div></div>
+      <div class="row"><div class="grow">Download in Low Data Mode<div class="sub">Clips are a few MB each</div></div><div class="switch on"></div></div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow">More by the artist</div><div class="info">i</div><div class="switch on"></div></div>
+      <div class="row"><div class="grow">Related music videos</div><div class="info">i</div><div class="switch on"></div></div>
+      <div class="row"><div class="grow">Concerts</div><div class="info">i</div><div class="switch on"></div></div>
+    </div>
+  `,
+};
+
+const TITLES = { appearance: "Appearance", player: "Player", albums: "Albums" };
+const body = document.getElementById("body");
+const title = document.getElementById("title");
+const screen = document.getElementById("screen");
+
+function show(page) {
+  body.innerHTML = PAGES[page];
+  title.textContent = TITLES[page];
+  screen.scrollTop = 0;
+  document.querySelectorAll(".seg-btn button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.page === page)));
+}
+
+document.querySelectorAll(".seg-btn button").forEach(button => {
+  button.addEventListener("click", () => show(button.dataset.page));
+});
+
+show("appearance");
+</script>
+</body>
+</html>

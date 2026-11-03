@@ -29,3 +29,19 @@ NSArray<NSString *> *SGShaderWhy(void);
 @property (nonatomic) CGFloat amount;
 + (BOOL)metalGrainAvailable;
 @end
+
+// The Visualizer's hills, on Metal: the spectrum as a crest drawn per pixel rather than as a path the app builds
+// every frame. The bands come in already eased, so the shader only draws the two hills and the glow.
+//
+// Same ground rules as the grain: it draws only while it is in a window and `moving`, and it answers NO from
+// +metalHillsAvailable where the library is missing, so PlayerVisualiser.m keeps its Core Animation path.
+@interface SGHillsView : MTKView
++ (BOOL)metalHillsAvailable;
+// `count` levels, 0 to 1 from the foot to the top of the view; nil while the song sends nothing.
+- (void)setLevels:(const float *)levels count:(NSInteger)count;
+// The front hill's colour; the back one is derived from it, dimmer.
+@property (nonatomic, strong) UIColor *frontColor;
+@property (nonatomic, strong) UIColor *backColor;
+// Drawing at all: a paused song sets it NO and the timer stops with it.
+@property (nonatomic) BOOL moving;
+@end

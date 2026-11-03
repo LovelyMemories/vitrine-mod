@@ -1,4 +1,5 @@
 #import "SGShader.h"
+#import <string.h>
 #import "Core/SGCore.h"
 
 // The shaders, as Metal source. They are compiled at runtime so that a tree without a .metal target still builds
@@ -27,6 +28,30 @@ static NSString *const kShaderSource = @""
 "}\n"
 "\n"
 "struct SGFrame { float2 size; float time; float amount; };\n"
+"\n"
+"#define SG_BANDS 24\n"
+"\n"
+"struct SGHills { float2 size; float4 front; float4 back; float levels[SG_BANDS]; };\n"
+"\n"
+"// The two hills: for every column of the screen, the level is interpolated from the bands that stand on either\n"
+"// side of it, and everything below the crest is filled with the hill's colour, thinning out toward the crest so\n"
+"// a peak ends in light rather than in an edge.\n"
+"static inline float sgaHill(float u, constant float *levels) {\n"
+"    float at = clamp(u, 0.0, 1.0) * (SG_BANDS - 1);\n"
+"    int i = int(floor(at));\n"
+"    int j = min(i + 1, SG_BANDS - 1);\n"
+"    return mix(levels[i], levels[j], fract(at));\n"
+"}\n"
+"\n"
+"fragment half4 sgaHills(SGAVertex in [[stage_in]], constant SGHills &h [[buffer(0)]]) {\n"
+"    // The back hill is drawn wider and taller, as the Core Animation path has it.\n"
+"    float back = sgaHill(in.uv.x, h.levels) * 1.25;\n"
+"    float front = sgaHill(in.uv.x, h.levels);\n"
+"    float4 color = float4(0.0);\n"
+"    color += h.back * smoothstep(back, back - 0.25, 1.0 - in.uv.y);\n"
+"    color += h.front * smoothstep(front, front - 0.18, 1.0 - in.uv.y);\n"
+"    return half4(clamp(color.rgb, 0.0, 1.0), clamp(color.a, 0.0, 1.0));\n"
+"}\n"
 "\n"
 "// Grain, for the Fluid field's film look: pixel noise at a share of `amount`, moving with `time`.\n"
 "fragment half4 sgaGrain(SGAVertex in [[stage_in]], constant SGFrame &f [[buffer(0)]]) {\n"
@@ -179,6 +204,121 @@ typedef struct {
 
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
     // Nothing to rebuild: the shader reads the size from the uniforms each frame.
+}
+
+@end
+
+#define SG_BANDS 24
+
+// The frame the hills shader takes: the view's size, the two colours, and the bands, eased already.
+typedef struct {
+    float width, height;
+    float front[4], back[4];
+    float levels[SG_BANDS];
+} SGHillsUniforms;
+
+@implementation SGHillsView {
+    id<MTLRenderPipelineState> _pipeline;
+    NSTimer *_timer;
+    float _levels[SG_BANDS];
+    BOOL _hasLevels;
+}
+
++ (BOOL)metalHillsAvailable {
+    return SGShaderLibrary.shared != nil;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    SGShaderLibrary *kit = SGShaderLibrary.shared;
+    if (!kit) return nil;
+    if (!(self = [super initWithFrame:frame device:kit.device])) return nil;
+    self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    self.framebufferOnly = YES;
+    self.opaque = NO;
+    self.backgroundColor = UIColor.clearColor;
+    self.userInteractionEnabled = NO;
+    self.enableSetNeedsDisplay = NO;
+    self.paused = YES;
+    self.delegate = self;
+    self.frontColor = UIColor.whiteColor;
+    self.backColor = [UIColor colorWithWhite:1 alpha:0.5];
+    NSError *error = nil;
+    id<MTLFunction> vertex = [kit.library newFunctionWithName:@"sgaFullscreen"];
+    id<MTLFunction> fragment = [kit.library newFunctionWithName:@"sgaHills"];
+    if (vertex && fragment) {
+        MTLRenderPipelineDescriptor *descriptor = [MTLRenderPipelineDescriptor new];
+        descriptor.vertexFunction = vertex;
+        descriptor.fragmentFunction = fragment;
+        descriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+        MTLRenderPipelineColorAttachmentDescriptor *attachment = descriptor.colorAttachments[0];
+        attachment.blendingEnabled = YES;
+        attachment.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+        attachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        _pipeline = [kit.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    }
+    if (!_pipeline) {
+        SGLog(@"shaders: the hills pipeline did not build: %@", error.localizedDescription ?: @"no reason given");
+        return nil;
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [_timer invalidate];
+}
+
+- (void)setLevels:(const float *)levels count:(NSInteger)count {
+    _hasLevels = levels != NULL;
+    for (NSInteger i = 0; i < SG_BANDS; i++) _levels[i] = _hasLevels && i < count ? levels[i] : 0;
+}
+
+- (void)setMoving:(BOOL)moving {
+    if (moving == _moving) return;
+    _moving = moving;
+    [_timer invalidate];
+    _timer = nil;
+    if (!moving) return;
+    __weak typeof(self) weakSelf = self;
+    _timer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0 repeats:YES block:^(NSTimer *timer) {
+        SGHillsView *view = weakSelf;
+        if (!view.window || !view.moving) return;
+        [view draw];
+    }];
+}
+
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    BOOL moving = _moving;
+    _moving = !moving;   // forces setMoving to take effect again for the new window
+    [self setMoving:moving];
+}
+
+- (void)drawInMTKView:(MTKView *)view {
+    SGShaderLibrary *kit = SGShaderLibrary.shared;
+    if (!kit || !_pipeline || !self.window || !_moving || !_hasLevels) return;
+    id<CAMetalDrawable> drawable = view.currentDrawable;
+    MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
+    if (!drawable || !pass) return;
+
+    SGHillsUniforms uniforms = {0};
+    uniforms.width = (float)view.drawableSize.width;
+    uniforms.height = (float)view.drawableSize.height;
+    CGFloat r = 0, g = 0, b = 0, a = 1;
+    [self.frontColor getRed:&r green:&g blue:&b alpha:&a];
+    CGFloat br = 0, bg = 0, bb = 0, ba = 1;
+    [self.backColor getRed:&br green:&bg blue:&bb alpha:&ba];
+    uniforms.front[0] = (float)r; uniforms.front[1] = (float)g; uniforms.front[2] = (float)b; uniforms.front[3] = (float)a;
+    uniforms.back[0] = (float)br; uniforms.back[1] = (float)bg; uniforms.back[2] = (float)bb; uniforms.back[3] = (float)ba;
+    memcpy(uniforms.levels, _levels, sizeof _levels);
+
+    id<MTLCommandBuffer> buffer = [kit.queue commandBuffer];
+    id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:pass];
+    [encoder setRenderPipelineState:_pipeline];
+    [encoder setFragmentBytes:&uniforms length:sizeof uniforms atIndex:0];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+    [encoder endEncoding];
+    [buffer presentDrawable:drawable];
+    [buffer commit];
 }
 
 @end

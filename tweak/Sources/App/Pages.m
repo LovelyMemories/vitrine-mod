@@ -17,6 +17,7 @@
 #import "Native/NowPlayingBar/NowPlayingBar.h"
 #import "Native/Player/NowPlaying.h"
 #import "Shared/Lossless/SGLossless.h"
+#import "Shared/AutoMix/AutoMix.h"
 #import "Redesigned/Lyrics/LyricsText.h"
 #import "Redesigned/Lyrics/LyricsLook.h"
 #import "Redesigned/Navbar/Navbar.h"
@@ -163,6 +164,13 @@ UIViewController *SGPlayerSettingsPage(void) {
     [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
         SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
     ])];
+
+    // AutoMix: the cue points of a transition, handed to Spotify's own engine (Shared/AutoMix).
+    [sections addObject:SGNotedSection(@"Transitions", @[
+        SGWithTile(SGOptionRow(@"AutoMix", @"Blend each song into the next", SGKeyAutoMix), @"arrow.triangle.merge", UIColor.systemTealColor),
+    ], @"Every song fades out over its last 12 seconds and the next one in over its first 12, and the two meet in the "
+       @"middle. Spotify's own crossfade plays the meeting; the points are placed from each track's length, so a "
+       @"transition lines up in time but not beat for beat. Applies after you restart Spotify.")];
 
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Your own FLACs in place of Spotify's stream", SGKeyLossless),

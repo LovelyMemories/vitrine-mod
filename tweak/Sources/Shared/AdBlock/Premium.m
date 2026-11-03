@@ -109,8 +109,8 @@ static const SGRule rules[] = {
     // Premium account's sets both off (compared on 2026-10-09: the other core-ads values are the same for both).
     {"core-ads", "enable_state_fetch_system", SGRuleForce, NO, NULL},
     {"core-ad-detection", "use_ad_placements_beta", SGRuleForce, NO, NULL},
-    {"ios-feature-settings", "use_playback_settings_crossfade", SGRuleForce, NO, NULL},
-    {"ios-feature-settings", "use_playback_settings_gapless", SGRuleForce, NO, NULL},
+    {"playback-settings", "use_playback_settings_crossfade", SGRuleForce, NO, NULL},
+    {"playback-settings", "use_playback_settings_gapless", SGRuleForce, NO, NULL},
     {NULL, "enable_common_capping", SGRuleRemove, NO, NULL},
     {NULL, "enable_pns_common_capping", SGRuleRemove, NO, NULL},
     {NULL, "enable_pick_and_shuffle_common_capping", SGRuleRemove, NO, NULL},
@@ -365,9 +365,6 @@ static const SGRule rules[] = {
     // Smart shuffle stays on in a Jam, as on Premium.
     {"ios-system-smartshuffle", "allow_smart_shuffle_in_jams", SGRuleForce, YES, NULL},
     {"core-player", "disable_smart_shuffle_when_in_jam", SGRuleForce, NO, NULL},
-    // Automix: blended transitions between songs, off for Free.
-    {"core-automix", "automix_enabled", SGRuleForce, YES, NULL},
-    {"ios-feature-settings", "automix_enabled", SGRuleForce, YES, NULL},
 };
 static const size_t ruleCount = sizeof(rules) / sizeof(rules[0]);
 
@@ -424,6 +421,18 @@ static NSData *patchConfiguration(NSData *configuration) {
             continue;
         }
         NSString *scope = SGPBText(SGPBFirst(parts, 1)) ?: @"", *name = SGPBText(SGPBFirst(parts, 2)) ?: @"";
+        // The core reads this scope while Settings and AutoMix write the older audio.crossfade prefs, so with the
+        // server's flag on every one of their writes misses the store the core reads. Said once, since it is the
+        // first thing to check when a crossfade does nothing.
+        if ([scope isEqualToString:@"playback-settings"] && [name isEqualToString:@"use_playback_settings_crossfade"]) {
+            static BOOL logged;
+            if (!logged) {
+                logged = YES;
+                SGPBField *flag = SGPBFirst(value, 3);
+                SGLog(@"premium: the server sends playback-settings.use_playback_settings_crossfade = %@; forced off so the core reads the prefs Settings writes",
+                      flag ? (flag.payload.length ? @"true" : @"false") : @"absent");
+            }
+        }
         BOOL removed = NO;
         for (size_t i = 0; i < ruleCount && !removed; i++) {
             if (!ruleMatches(&rules[i], scope, name)) continue;

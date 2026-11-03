@@ -65,6 +65,9 @@
 
 @interface SGModPage : SGPage
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer;
+// A strip of pictures at the top of the page, above the intro and the first card (the Appearance page's app
+// icons): placed in a header of its own when the page first appears. nil for none.
+@property (nonatomic, strong) UIView *iconStrip;
 // Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
 - (void)refreshVisibility;
 // Rows draw their symbol on a colored tile; off, the default, they show none. Mod Settings' main page has them.

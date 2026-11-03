@@ -767,6 +767,23 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // A strip of pictures, the first thing on the page: a card of its own above the rows, with the page's intro
+    // under it, so both read as one header.
+    if (self.iconStrip && !self.iconStrip.superview) {
+        UITableView *table = self.tableView;
+        CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
+        UIView *header = [UIView new];
+        self.iconStrip.frame = CGRectMake(inset, 12, width - 2 * inset, self.iconStrip.frame.size.height);
+        [header addSubview:self.iconStrip];
+        UIView *intro = _intro;
+        if (intro) {
+            intro.frame = CGRectMake(inset, CGRectGetMaxY(self.iconStrip.frame) + 6, width - 2 * inset, intro.frame.size.height);
+            [header addSubview:intro];
+            table.tableHeaderView = nil;
+        }
+        header.frame = CGRectMake(0, 0, width, CGRectGetMaxY(intro ? intro.frame : self.iconStrip.frame) + 8);
+        table.tableHeaderView = header;
+    }
     // Reloaded whether or not anything ticks: a choice row is showing whatever was picked on the
     // page it opened, which is gone by the time this one comes back, and may bring rows or take them.
     _shown = [self rowsToShow];

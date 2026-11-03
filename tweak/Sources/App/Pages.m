@@ -1,5 +1,6 @@
 #import "Core/SGCore.h"
 #import "Shared/AppIcon/AppIcon.h"
+#import "Shared/AppIcon/AppIconStrip.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Redesigned/Player/Player.h"
@@ -93,12 +94,16 @@ SGModRow *SGRedesignedUIRow(void) {
 // Redesigned UI itself leads Mod Settings' main page; the language is on that page, under All flags.
 UIViewController *SGAppearancePage(void) {
     NSMutableArray<SGModRow *> *everywhere = [NSMutableArray arrayWithArray:SGAppFontRows()];
-    SGModRow *icon = SGAppIconRow();
+    // The strip of icons is a header of its own: the first card of the page, over the row that counts them all.
+    UIView *strip = SGAppIconStrip();
+    SGModRow *icon = SGAppIconCountRow();
     if (icon) [everywhere addObject:icon];
-    return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
+    SGModPage *page = [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
         SGSection(nil, SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()),
         SGSection(nil, everywhere),
     ] footer:nil];
+    if (strip) page.iconStrip = strip;
+    return page;
 }
 
 UIViewController *SGNavbarPage(void) {

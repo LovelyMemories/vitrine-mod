@@ -170,7 +170,9 @@ static SGRHomeKind gridKind(UICollectionView *grid) {
     UIView *cell = grid.visibleCells.firstObject;
     // A grid the list sized before it laid its own cells out: nothing but the shortcuts has come as one.
     if (cell && !contentNames(cell.subviews.firstObject, @"Home_AnchorsAndShortcutsKit")) return SGRHomeKindDrop;
-    return SGHidden(SGRKeyHomeHideShortcuts) ? SGRHomeKindDrop : SGRHomeKindKeep;
+    // The shortcuts grid is not on Home unless asked for: Home is the shelves and Top picks, which is what the
+    // 1.0.1 build does (its hideShortcuts is on out of the box). A stored switch still wins either way.
+    return SGFlag(SGRKeyHomeHideShortcuts, YES) ? SGRHomeKindDrop : SGRHomeKindKeep;
 }
 
 // The previews (a video or a playlist playing as Home scrolls) are medium density cards, on their own or under a
@@ -187,7 +189,8 @@ static SGRHomeKind optionalKind(NSString *name) {
 static SGRHomeKind stackKind(UIStackView *stack) {
     for (UIView *part in stack.arrangedSubviews) {
         NSString *name = NSStringFromClass(part.class);
-        if ([name containsString:@"Discovery_DJElementKit"]) return SGHidden(SGRKeyHomeHideDJ) ? SGRHomeKindDrop : SGRHomeKindKeep;
+        // The DJ card is not on Home unless asked for, as in the 1.0.1 build. A stored switch still wins.
+        if ([name containsString:@"Discovery_DJElementKit"]) return SGFlag(SGRKeyHomeHideDJ, YES) ? SGRHomeKindDrop : SGRHomeKindKeep;
         SGRHomeKind optional = optionalKind(name);
         if (optional == SGRHomeKindKeep) return optional;
     }

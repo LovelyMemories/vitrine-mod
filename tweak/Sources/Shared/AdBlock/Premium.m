@@ -118,6 +118,10 @@ static const SGRule rules[] = {
     {"core-ad-detection", "use_ad_placements_beta", SGRuleForce, NO, NULL},
     {"playback-settings", "use_playback_settings_crossfade", SGRuleForce, NO, NULL},
     {"playback-settings", "use_playback_settings_gapless", SGRuleForce, NO, NULL},
+    // The switch behind the other two: while it is on, the client fetches and uses the account's own playback
+    // settings at start and ignores the ones Settings writes. Seen on a 2026-11-04 device log, where it was the
+    // only playback-settings key left on.
+    {"playback-settings", "enable_device_settings_init_fetch", SGRuleForce, NO, NULL},
     {NULL, "enable_common_capping", SGRuleRemove, NO, NULL},
     {NULL, "enable_pns_common_capping", SGRuleRemove, NO, NULL},
     {NULL, "enable_pick_and_shuffle_common_capping", SGRuleRemove, NO, NULL},
@@ -455,7 +459,8 @@ static NSData *patchConfiguration(NSData *configuration) {
         }
         if (removed) continue;
         // The two flags the Settings page's crossfade and AutoMix rows hang on, as they leave this side.
-        if ([name isEqualToString:@"crossfade_enabled"] || [name isEqualToString:@"automix_enabled"]) {
+        if ([name isEqualToString:@"crossfade_enabled"] || [name isEqualToString:@"automix_enabled"]
+            || [name hasPrefix:@"use_playback_settings"] || [name isEqualToString:@"enable_device_settings_init_fetch"]) {
             SGPBField *flag = SGPBFirst(value, 3);
             SGLog(@"premium: out %@.%@ = %@", scope, name, flag ? (flag.payload.length ? @"true" : @"false") : @"absent");
         }

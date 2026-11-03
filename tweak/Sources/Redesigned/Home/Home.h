@@ -45,6 +45,9 @@ BOOL SGRHomeLook(void);
 #define SGRKeyHomeShelfHidePrefix @"spotifyglass.redesign.home.hide.shelf."
 // The shelves seen lately: identity -> the date it was last on Home (HomeShelves.m).
 #define SGRKeyHomeShelvesSeen @"spotifyglass.redesign.home.shelvesSeen"
+// Podcasts and audiobooks off Home (the switch the 1.0.1 build calls hidePodcasts): on until switched off, and
+// read as Home lays out. The shelves themselves go through the same shelf switch as any other.
+#define SGRKeyHomeHidePodcasts @"spotifyglass.redesign.home.hidePodcasts"
 
 @class SGModRow;
 SGModRow *SGRHomeTopPicksRow(void);

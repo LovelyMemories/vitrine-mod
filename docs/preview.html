@@ -356,7 +356,15 @@
 
   <h3 style="margin-top:22px">Коммиты этой сессии</h3>
   <ul class="log">
-    <li><code>c522b76</code> — <b>карточки Albums, Home и полоса акцентов</b></li>
+    <li><code>732ac6f</code> — <b>шейдер читает числа Fluid</b>, Adjust двигает поле</li>
+    <li><code>d78ab15</code> — полоса пресетов: карточки рисуются, полоса скроллится</li>
+    <li><code>f4e7c71</code> — слайдеры Fluid на своей странице <b>Adjust</b></li>
+    <li><code>780fb58</code> — Fluid на карточке — шейдер, в цветах обложки</li>
+    <li><code>08b92ae</code> — их шейдерная библиотека + ambient-поле в Home</li>
+    <li><code>d5e2c51</code> — 23 иконки и нормальные названия</li>
+    <li><code>f860ae3</code> — <code>SGMarqueeLabel.textAlignment</code></li>
+    <li><code>c522b76</code> — карточки Albums, Home и полоса акцентов</li>
+  </ul>
     <li><code>bab4aab</code> — фикс краша Appearance (NSNull в полосе иконок)</li>
     <li><code>b7d17cc</code> — <code>SGPlayerMenuAnimatedArtwork</code> в PlayerSettings</li>
     <li><code>31b254b</code> — то же имя в PlayerField + импорт SpeedPitch.h</li>
@@ -499,10 +507,12 @@ const pages = {
     <div class="presets" id="presets">
       ${PRESETS.map(([n, g, key], i) => `<div class="preset ${i === 0 ? "on" : ""}" data-preset="${key}"><div class="pic" style="background:${g}"></div><div class="n">${n}</div></div>`).join("")}
     </div>
-    <div class="sec">Fluid</div>
     <div class="card">
-      ${[["Speed", 62], ["Warp", 40], ["Blur", 55], ["Saturation", 100], ["Brightness", 100], ["Grain", 18]]
-        .map(([n, v]) => `<div class="row"><div class="grow">${n}<div class="slider"><i style="width:${v}%"></i><b style="left:${v}%"></b></div></div></div>`).join("")}
+      <div class="row">
+        <div class="tile" style="background:#3a3a3f">⇅</div>
+        <div class="grow">Adjust<div class="sub">Fluid's speed, warp, blur, saturation, brightness and grain</div></div>
+        <div class="chev">›</div>
+      </div>
     </div>
     <div class="sec">Controls</div>
     <div class="card">
@@ -601,11 +611,11 @@ const NOTES = {
     done: [
       "Карточка — <b>экран плеера целиком</b>, как в новой сборке: грабер сверху, две стеклянные кнопки (⌄ и ⋯), обложка по центру, под ней альбом капителью, название 21 pt, артист, слайдер с прошедшим и оставшимся временем и футер с тремя кнопками. Высота 1.34 от ширины, было 0.5.",
       "Превью живое: обложка, название, артист и альбом — настоящие, из <code>SGShownTrack</code>; прогресс — где трек был, когда страница открылась.",
-      "<b>Восемь фонов</b> по 10 pt: Still · Colors · Fluid · Animated · Visualizer · Aurora · Black · Auto. Под полосой — строка о том, что выбранный фон делает; жми имена, и она меняется.",
-      "<b>Пресеты</b> есть только у Fluid: строка появляется и исчезает вместе с выбором.",
+      "<b>Fluid на карточке — шейдер</b>: <code>SGAmbientView</code> в цветах обложки (<code>SGRPalette</code>: цвет края = свет, цвет поля = тень). Блобы Core Animation на это время прячутся, а если Metal не завёлся — возвращаются.",
+      "Слайдеры Fluid переехали на страницу <b>Adjust</b> — одной строкой с Player, как <code>SGRPlayerAdjustPage</code> в новой сборке. Шесть чисел читаются шейдером на каждом кадре: Speed — скорость складок, Warp — их ширина, Brightness и Saturation — усиление, Grain — зерно.",
+      "<b>Восемь фонов</b>: Still · Colors · Fluid · Animated · Visualizer · Aurora · Black · Auto. Под полосой — строка о том, что выбранный фон делает; жми имена, и она меняется.",
+      "<b>Пресеты</b> Soft · Calm · Slow · Vivid · Bright · Fast: карточки рисуются сами (четыре радиальные заливки по числам пресета), полоса скроллится внутри карточки, кольцо на выбранном.",
       "<b>Aurora</b> переписана: не четыре шара, а занавеси света на чёрном — шесть полос, у каждой два цвета в противофазе, качание 7 + i·1.5 с. Стало ярче: насыщенность ×1.5, яркость ×2.8, пол 0.92.",
-      "<b>Пресеты Fluid</b> — карточки Soft · Calm · Slow · Vivid · Bright · Fast с кольцом акцента, вместо строки-меню. Видны только когда выбран Fluid.",
-      "<b>Зерно</b> считается шейдером на Metal (<code>SGGrainView</code>), с запасным тайлом, если шейдер не собрался.",
       "<b>Cover</b> убран совсем: в списке фонов его больше нет.",
     ],
     todo: [

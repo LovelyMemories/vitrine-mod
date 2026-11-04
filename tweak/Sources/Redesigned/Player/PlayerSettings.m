@@ -541,8 +541,9 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
 
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };
+    // The sources of the moving artwork, shown whatever the background is: they are what Animated and the
+    // player's own clip lookups read, and the newer build keeps the row in sight.
     SGModRow *sources = SGMotionSourcesRow();
-    sources.visible = lowData.visible;
 
     // The looks as cards, above the rows: picking one lays its six settings over everything at once, and the
     // sliders on Adjust then show what it set.
@@ -559,6 +560,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
+
         SGSection(nil, @[SGWithSymbol(adjust, @"slider.horizontal.3")]),
         SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume),
                                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover),

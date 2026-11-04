@@ -128,17 +128,19 @@ void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *a
 }
 
 SGModRow *SGMotionSourcesRow(void) {
-    SGModRow *row = SGPageRow(@"Artwork sources", ^UIViewController *{
+    SGModRow *row = SGPageRow(@"Sources", ^UIViewController *{
         return SGSourcesPageMake(@"Artwork sources", @"Asked top to bottom until one has a clip for the track. Apple Music is "
                                                      @"asked for the album by its name; it never sees your account.",
                                  allSources(), ^NSArray<NSString *> * { return SGMotionSourceOrder(); },
                                  ^(NSArray<NSString *> *keys) { [NSUserDefaults.standardUserDefaults setObject:keys forKey:SGKeyMotionSources]; });
     });
     row.value = ^NSString * {
-        NSArray<NSString *> *order = SGMotionSourceOrder();
-        if (!order.count) return @"Off";
-        NSString *first = [order.firstObject isEqualToString:kCanvas] ? @"Canvas" : @"Apple Music";
-        return order.count == 1 ? first : [NSString stringWithFormat:@"%@ +%lu", first, (unsigned long)order.count - 1];
+        // Both names, in the order they are asked in, as the newer build writes them: "Spotify Canvas, Apple Music".
+        NSMutableArray<NSString *> *names = [NSMutableArray array];
+        for (NSString *key in SGMotionSourceOrder()) {
+            [names addObject:[key isEqualToString:kCanvas] ? @"Spotify Canvas" : @"Apple Music"];
+        }
+        return names.count ? [names componentsJoinedByString:@", "] : @"Off";
     };
     return SGWithSymbol(row, @"square.stack.3d.down.right");
 }

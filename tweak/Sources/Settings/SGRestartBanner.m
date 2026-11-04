@@ -40,7 +40,7 @@ NSInteger SGRRestartChangeCount(void) {
     _button.backgroundColor = SGColorRGB(0xFF375F);
     _button.layer.cornerRadius = 16;
     _button.layer.cornerCurve = kCACornerCurveContinuous;
-    [_button setTitle:@"Restart" forState:UIControlStateNormal];
+    [_button setTitle:@"Restart now" forState:UIControlStateNormal];
     [_button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     _button.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     [_button addTarget:self action:@selector(restart) forControlEvents:UIControlEventTouchUpInside];

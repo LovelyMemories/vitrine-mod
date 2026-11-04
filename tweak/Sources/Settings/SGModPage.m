@@ -571,6 +571,9 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 }
 
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer {
+    // A page that opens with the restart note is a page a launch reads once: the banner under it counts what
+    // has been changed since Spotify started.
+    _restartPage = [intro isEqualToString:SGRestartNote];
     if (!(self = [super initWithStyle:UITableViewStyleInsetGrouped])) return nil;
     self.title = title;
     _sections = sections;
@@ -757,10 +760,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 // A page that opens with the restart note is a page of settings a launch reads once: the banner under it counts
 // what has been changed since Spotify started, and offers the restart.
 - (BOOL)pageWaitsForRestart {
-    for (UIView *view in _intro.subviews) {
-        if ([view isKindOfClass:UILabel.class] && [((UILabel *)view).text isEqualToString:SGRestartNote]) return YES;
-    }
-    return NO;
+    return _restartPage;
 }
 
 - (void)viewDidLayoutSubviews {

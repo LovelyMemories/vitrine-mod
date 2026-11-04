@@ -1,14 +1,15 @@
 // The albums page's card: an album's page drawn small, the way the redesign lays one out -- the cover under the
-// title, a row of its own buttons, the tracks with their play counts, and what sits under them. It is a picture of
-// the page, not the page: no live data, no touches, the same on every album, so the switches below are read
-// against something rather than against nothing.
+// title, a row of its own buttons, the tracks with their lengths, and what sits under them. It is a picture of the
+// page, not the page: no live data, no touches, and one album's worth of it (Evolve, whose shape everyone knows),
+// so the switches below are read against something rather than against nothing.
 #import "AlbumShowcase.h"
 #import "Core/SGCore.h"
 #import "Settings/SGPageStyle.h"
 
-// The tracks the card has room for, and what each one shows: a number, a name, a length.
-static NSString *const kTitles[] = {@"Opening", @"Second Light", @"Half Way", @"The Last One"};
-static NSString *const kLengths[] = {@"0:32", @"3:04", @"2:47", @"4:12"};
+// The tracks the card has room for, and what each one shows: a number, a name, a length. The example is an album
+// whose shape everyone knows, so a switch that takes a section off reads against something real.
+static NSString *const kTitles[] = {@"I Don't Know Why", @"Whatever It Takes", @"Believer", @"Thunder"};
+static NSString *const kLengths[] = {@"3:10", @"3:21", @"3:24", @"3:07"};
 
 @implementation SGRAlbumShowcase {
     UIView *_hero, *_cover, *_controls, *_tracks, *_shelf;
@@ -49,20 +50,20 @@ static NSString *const kLengths[] = {@"0:32", @"3:04", @"2:47", @"4:12"};
     [_cover addSubview:_coverImage];
 
     _title = [UILabel new];
-    _title.text = @"The Album";
+    _title.text = @"Evolve";
     _title.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
     _title.textColor = UIColor.whiteColor;
     _title.numberOfLines = 2;
     [_hero addSubview:_title];
 
     _creator = [UILabel new];
-    _creator.text = @"The Artist";
+    _creator.text = @"Imagine Dragons";
     _creator.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
     _creator.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     [_hero addSubview:_creator];
 
     _kind = [UILabel new];
-    _kind.text = @"Album · 2024";
+    _kind.text = @"Album · 2017";
     _kind.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     _kind.textColor = [UIColor colorWithWhite:1 alpha:0.45];
     [_hero addSubview:_kind];
@@ -125,8 +126,8 @@ static NSString *const kLengths[] = {@"0:32", @"3:04", @"2:47", @"4:12"};
 
     // Under the tracks, the album's notes, a line of them, and where it was made.
     _notes = [UILabel new];
-    _notes.text = @"Recorded over one winter, the record keeps the room it was made in: one microphone, the band "
-                  @"in a circle, and nothing taken out afterwards.";
+    _notes.text = @"Evolve is Imagine Dragons at their most direct: big drums, voices stacked into a chorus, and "
+                  @"the three-minute pop song taken as far as it goes.";
     _notes.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     _notes.textColor = [UIColor colorWithWhite:1 alpha:0.4];
     _notes.numberOfLines = 2;
@@ -152,7 +153,7 @@ static NSString *const kLengths[] = {@"0:32", @"3:04", @"2:47", @"4:12"};
     }
 
     _foot = [UILabel new];
-    _foot.text = @"June 28, 2024 · 9 songs · 32 min";
+    _foot.text = @"June 23, 2017 · 11 songs · 39 min";
     _foot.font = [UIFont systemFontOfSize:10.5 weight:UIFontWeightRegular];
     _foot.textColor = [UIColor colorWithWhite:1 alpha:0.3];
     [self addSubview:_foot];

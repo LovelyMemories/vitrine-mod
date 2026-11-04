@@ -61,7 +61,9 @@ static UIImage *preview(NSString *name) {
         }
         return [UIImage systemImageNamed:@"app.fill"];
     }
-    for (NSString *suffix in @[@"120x120@2x", @"60x60@3x", @"60x60@2x"]) {
+    // Our pipeline writes the app's own icon sizes -- NAME@2x, NAME@3x -- while the newer build's bundle carries
+    // NAME60x60@2x and the like: both are asked for, so the strip draws whichever this IPA was made with.
+    for (NSString *suffix in @[@"@3x", @"@2x", @"60x60@3x", @"60x60@2x", @"120x120@2x"]) {
         UIImage *image = [UIImage imageNamed:[NSString stringWithFormat:@"%@%@", name, suffix]];
         if (image) return image;
     }
@@ -193,8 +195,11 @@ static void setIcon(NSString *icon) {
 @end
 
 UIView *SGAppIconStrip(void) {
+    // Shown wherever the IPA carries alternates, even where iOS refuses to switch one (a sideloaded app in a
+    // container, whose host does not take an alternate icon): the tap is then refused with a message instead of the
+    // page quietly having no icons at all.
     NSArray<NSString *> *names = iconNames();
-    if (!UIApplication.sharedApplication.supportsAlternateIcons) return nil;
+    if (!names.count) return nil;
     SGAppIconStripView *strip = [[SGAppIconStripView alloc] initWithFrame:CGRectMake(0, 0, 320, 92)];
     strip.names = [@[NSNull.null] arrayByAddingObjectsFromArray:names];
     return strip;
@@ -293,7 +298,7 @@ UIView *SGAppIconStrip(void) {
 
 SGModRow *SGAppIconCountRow(void) {
     NSArray<NSString *> *names = iconNames();
-    if (!names.count || !UIApplication.sharedApplication.supportsAlternateIcons) return nil;
+    if (!names.count) return nil;
     SGModRow *row = SGPageRow(@"All icons", ^{ return (UIViewController *)[SGAppIconPickerPage new]; });
     row.value = ^NSString *{ return [@(names.count) stringValue]; };
     return row;

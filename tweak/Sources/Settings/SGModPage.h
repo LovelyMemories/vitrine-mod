@@ -1,5 +1,6 @@
 // A page of sections of rows, the shape of every feature's settings page.
 #import "SGPage.h"
+#import "SGPageStyle.h"
 
 // A row is a switch when it has a key, a link to another page when it has a page and a slider when it has
 // a number. A flag row
@@ -108,7 +109,6 @@ SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^v
 // The system color picker in a page sheet, opaque colors only: the checkmark hands 0xRRGGBB to `picked`,
 // closing or swiping the sheet away keeps what was there.
 void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rgb));
-UIColor *SGColorRGB(NSInteger rgb);   // 0xRRGGBB, opaque
 SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url);
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void));
 SGModSection *SGSection(NSString *title, NSArray<SGModRow *> *rows);

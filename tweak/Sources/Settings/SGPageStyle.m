@@ -6,6 +6,15 @@ static UIFont *sg_spotifyFont;
 // The dark appearance's secondary label, fixed rather than dynamic so a view that is not set dark reads it too.
 UIColor *SGGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.6]; }
 
+// Made from a CGColor: either look's accent hooks swap Spotify's green as UIColor makes it from components, and
+// this color has to stay the one asked for, Spotify's green included, to show what a preset is.
+UIColor *SGColorRGB(NSInteger rgb) {
+    CGColorRef cg = CGColorCreateSRGB(((rgb >> 16) & 0xFF) / 255.0, ((rgb >> 8) & 0xFF) / 255.0, (rgb & 0xFF) / 255.0, 1);
+    UIColor *color = [UIColor colorWithCGColor:cg];
+    CGColorRelease(cg);
+    return color;
+}
+
 // Spotify's typeface at the sizes of its own lists, asked for by name so the app font of Shared/Fonts follows,
 // and the system font before Spotify has registered it. Grown with Dynamic Type through the accessibility
 // sizes, with no cap: the rows laid out by hand measure their text from these fonts.

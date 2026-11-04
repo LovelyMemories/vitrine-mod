@@ -239,15 +239,6 @@ SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^v
 
 @end
 
-// Made from a CGColor: either look's accent hooks swap Spotify's green as UIColor makes it from components, and
-// this color has to stay the one asked for, Spotify's green included, to show what a preset is.
-UIColor *SGColorRGB(NSInteger rgb) {
-    CGColorRef cg = CGColorCreateSRGB(((rgb >> 16) & 0xFF) / 255.0, ((rgb >> 8) & 0xFF) / 255.0, (rgb & 0xFF) / 255.0, 1);
-    UIColor *color = [UIColor colorWithCGColor:cg];
-    CGColorRelease(cg);
-    return color;
-}
-
 void SGPickColor(NSString *title, NSInteger initial, void (^picked)(NSInteger rgb)) {
     UIColorPickerViewController *picker = [UIColorPickerViewController new];
     picker.navigationItem.title = SGLocalized(title);

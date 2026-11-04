@@ -11,6 +11,9 @@ UIColor *SGAccentMark(void); // a visible accent mark on a dark card
 UIColor *SGRed(void);
 UIColor *SGPageBackground(void);
 UIColor *SGCardBackground(void);
+// Made from a CGColor: either look's accent hooks swap Spotify's green as UIColor makes it from components, and
+// this color has to stay the one asked for, Spotify's green included, to show what a preset is.
+UIColor *SGColorRGB(NSInteger rgb);   // 0xRRGGBB, opaque
 UIFont *SGTitleFont(void);      // a row's title and value, 13pt
 UIFont *SGSubtitleFont(void);   // subtitles, section headers, footers and notes, 11pt
 // Both grow through the accessibility sizes with no cap. A control beside a row's title, or text inside a

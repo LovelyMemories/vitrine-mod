@@ -501,6 +501,32 @@ UIViewController *SGRPlayerAdjustPage(void) {
     return page;
 }
 
+// Their words for it, when a look is picked: a small pill at the foot of the page that says "Fluid artwork is
+// picked" and goes away by itself, the way the newer build says it.
+static void sayPicked(UIView *host) {
+    if (!host) return;
+    UILabel *pill = [UILabel new];
+    pill.text = @"Fluid artwork is picked";
+    pill.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    pill.textColor = UIColor.whiteColor;
+    pill.textAlignment = NSTextAlignmentCenter;
+    pill.backgroundColor = [UIColor colorWithWhite:0.16 alpha:0.95];
+    pill.layer.cornerRadius = 16;
+    pill.layer.cornerCurve = kCACornerCurveContinuous;
+    pill.clipsToBounds = YES;
+    pill.alpha = 0;
+    CGFloat width = MIN(240, CGRectGetWidth(host.bounds) - 48);
+    pill.frame = CGRectMake(round((CGRectGetWidth(host.bounds) - width) / 2),
+                            CGRectGetHeight(host.bounds) - host.safeAreaInsets.bottom - 96, width, 32);
+    pill.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
+    [host addSubview:pill];
+    [UIView animateWithDuration:0.18 animations:^{ pill.alpha = 1; } completion:^(BOOL done) {
+        [UIView animateWithDuration:0.3 delay:1.2 options:0 animations:^{ pill.alpha = 0; } completion:^(BOOL gone) {
+            [pill removeFromSuperview];
+        }];
+    }];
+}
+
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
@@ -523,6 +549,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     strip = [[SGRFluidPresetStrip alloc] initWithFrame:CGRectMake(0, 0, 320, 152) names:SGRFluidPresetNames()
                                                picked:^(NSInteger index) {
         SGRApplyingFluidPreset((SGRFluidPreset)index);
+        sayPicked(weakPage.view);
         [weakPage.tableView reloadData];
     }];
     // The six numbers are a page of their own (SGRPlayerAdjustPage), one row from here.

@@ -216,10 +216,6 @@ static SGRHomeKind shelfKind(UIView *shelf) {
     NSString *identity = SGRHomeShelfIdentity(shelf);
     if (!identity) return SGRHomeKindKeep;
     SGRHomeNoteShelf(identity);
-    // Home is Top picks and nothing under it: every shelf is dropped, whatever its switch says. The shelves are still
-    // noted above, so the page's own list keeps naming them if this is undone.
-    logOnce(@"shelf dropped: Home carries Top picks only");
-    return SGRHomeKindDrop;
     // Podcasts and audiobooks are off Home unless asked for, as the 1.0.1 build has them; a stored switch still wins.
     if (SGFlag(SGRKeyHomeHidePodcasts, YES) && podcastsShelf(shelf)) {
         logOnce(@"podcasts shelf dropped");

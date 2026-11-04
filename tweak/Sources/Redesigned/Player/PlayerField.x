@@ -20,6 +20,7 @@
 // backgroundViewModel:didChangeColor:playerState:] (objc-methods.txt:57949).
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
+#import "Shared/Player/SpeedPitch.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Player.h"
 
@@ -56,7 +57,7 @@ NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
 SGRPlayerBackgroundKind SGRPlayerBackgroundResolved(void) {
     SGRPlayerBackgroundKind kind = SGRPlayerBackground();
     if (kind != SGRPlayerBackgroundAuto) return kind;
-    return SGRPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
+    return SGPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
 }
 
 // A paused song holds the colors still, the way it rests the cover (PlayerArtwork.x), and so does what lies over

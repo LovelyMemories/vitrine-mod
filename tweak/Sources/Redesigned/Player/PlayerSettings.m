@@ -422,7 +422,9 @@ static NSArray<NSString *> *backgroundNotes(void) {
             _overlay.layer.cornerCurve = kCACornerCurveContinuous;
             _overlay.clipsToBounds = YES;
             _overlay.hidden = YES;
+            _overlay.alpha = 0.55;   // the card's cover and words are under it: the field shows through, not over
             [self.view insertSubview:_overlay aboveSubview:self.tableView];
+
         }
     }
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(overlayArtworkChanged)

@@ -36,6 +36,7 @@
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 #import "PlayerPresetStrip.h"
+#import "PlayerBackgroundStrip.h"
 
 // The card is the player screen drawn small, as the newer build of this mod draws it: the grabber and the two
 // glass buttons at the top, the cover in the middle, the album, the title and the artist under it, the slider
@@ -383,7 +384,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 @interface SGRPlayerPage : SGModPage
 @property (nonatomic, strong) SGRPlayerShowcase *showcase;
-@property (nonatomic, strong) UISegmentedControl *backgrounds;
+@property (nonatomic, strong) SGRPlayerBackgroundStrip *backgrounds;
 @property (nonatomic, strong) SGRFluidPresetStrip *presets;
 @end
 
@@ -423,7 +424,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     CGFloat cardWidth = width - 2 * inset;
     CGFloat cardHeight = round(MIN(kCardMaxHeight, MAX(kCardMinHeight, cardWidth * kCardAspect)));
     self.showcase.frame = CGRectMake(inset, 16, cardWidth, cardHeight);
-    CGFloat controlHeight = MAX(32, ceil([self.backgrounds sizeThatFits:CGSizeMake(cardWidth, CGFLOAT_MAX)].height));
+    CGFloat controlHeight = MAX(148, ceil([self.backgrounds intrinsicContentSize].height));
     self.backgrounds.frame = CGRectMake(inset, CGRectGetMaxY(self.showcase.frame) + 12, cardWidth, controlHeight);
 
     CGFloat noteWidth = cardWidth - 2 * 4, room = 0;
@@ -455,14 +456,15 @@ static NSArray<NSString *> *backgroundNotes(void) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     // The player's ⋯ menu can switch Animated and Fluid while the page is away.
-    self.backgrounds.selectedSegmentIndex = SGRPlayerBackground();
+    self.backgrounds.artwork = SGRNowPlayingArtwork(NULL, NULL);
+    [self.backgrounds setSelected:SGRPlayerBackground()];
     [self showNote];
     [self.showcase reloadTrack];
     [self.showcase reloadBackgroundAnimated:NO];
 }
 
-- (void)backgroundPicked {
-    SGSetInt(SGRKeyPlayerBackground, self.backgrounds.selectedSegmentIndex);
+- (void)backgroundPicked:(NSInteger)index {
+    SGSetInt(SGRKeyPlayerBackground, index);
     [self.showcase reloadBackgroundAnimated:YES];
     [self showNote];
     [self refreshVisibility];
@@ -528,21 +530,20 @@ static void sayPicked(UIView *host) {
 }
 
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
+    __block __weak SGRPlayerPage *weakPage;
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
-    UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
-    backgrounds.selectedSegmentIndex = SGRPlayerBackground();
-    backgrounds.accessibilityLabel = @"Background";
-    backgrounds.apportionsSegmentWidthsByContent = YES;
-    // Nine names in one row: the smaller face is what lets them all fit and stay readable.
-    [backgrounds setTitleTextAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold]}
-                               forState:UIControlStateNormal];
+    SGRPlayerBackgroundStrip *backgrounds = [[SGRPlayerBackgroundStrip alloc] initWithFrame:CGRectMake(0, 0, 320, 148)
+                                                                               names:SGRPlayerBackgroundNames()
+                                                                              picked:^(NSInteger index) {
+        [weakPage backgroundPicked:index];
+    }];
+    backgrounds.artwork = SGRNowPlayingArtwork(NULL, NULL);
 
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };
     SGModRow *sources = SGMotionSourcesRow();
     sources.visible = lowData.visible;
 
-    __block __weak UITableViewController *weakPage;
     // The looks as cards, above the rows: picking one lays its six settings over everything at once, and the
     // sliders on Adjust then show what it set.
     __block SGRFluidPresetStrip *strip = nil;
@@ -577,6 +578,5 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     page.showcase = showcase;
     page.presets = strip;
     page.backgrounds = backgrounds;
-    [backgrounds addTarget:page action:@selector(backgroundPicked) forControlEvents:UIControlEventValueChanged];
     return page;
 }

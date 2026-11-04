@@ -79,7 +79,11 @@ static const CGFloat kCardWidth = 104, kCardHeight = 132, kGap = 10, kSide = 12;
 // of light, or not at all. Small on purpose -- it says which look it is, not what it will look like full screen.
 - (void)paint:(NSInteger)index {
     UIView *card = _cards[(NSUInteger)index];
-    UIImageView *picture = (UIImageView *)[card viewWithTag:1];
+    UIView *found = [card viewWithTag:1];
+    // The tag has to land on the picture and nothing else: sending -setImage: to a control is what took the page
+    // down, and a view found by tag is whatever was tagged.
+    if (![found isKindOfClass:UIImageView.class]) return;
+    UIImageView *picture = (UIImageView *)found;
     for (CALayer *layer in [picture.layer.sublayers copy]) [layer removeFromSuperlayer];
     picture.image = _artwork;
     picture.alpha = 1;
@@ -166,6 +170,7 @@ static const CGFloat kCardWidth = 104, kCardHeight = 132, kGap = 10, kSide = 12;
     for (UIView *card in _cards) {
         card.frame = CGRectMake(x, 8, kCardWidth, kCardHeight);
         UIView *picture = [card viewWithTag:1];
+        if (![picture isKindOfClass:UIImageView.class]) continue;
         picture.frame = CGRectMake(0, 0, kCardWidth, kCardHeight - 22);
         for (CALayer *layer in picture.layer.sublayers) layer.frame = picture.bounds;
         [card viewWithTag:2].frame = CGRectMake(-4, kCardHeight - 20, kCardWidth + 8, 16);

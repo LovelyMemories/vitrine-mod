@@ -30,6 +30,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Kit/SGRFluid.h"
 #import "Redesigned/Kit/SGShader.h"
+#import <CoreImage/CoreImage.h>
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
@@ -38,6 +39,37 @@
 #import "Player.h"
 #import "PlayerPresetStrip.h"
 #import "PlayerBackgroundStrip.h"
+
+// The printed cover: dithered and cut down to a few levels, the look the player gives a song with no moving
+// artwork of its own. Worked out once per picture and kept; a cover is 300 points wide, so this is one pass.
+static UIImage *printedCover(UIImage *image) {
+    if (!image.CGImage) return image;
+    static NSCache *cache;
+    static CIContext *context;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cache = [NSCache new];
+        cache.countLimit = 8;
+        context = [CIContext contextWithOptions:nil];
+    });
+    NSValue *key = [NSValue valueWithNonretainedObject:image];
+    UIImage *kept = [cache objectForKey:key];
+    if (kept) return kept;
+    CIImage *input = [CIImage imageWithCGImage:image.CGImage];
+    CIFilter *dither = [CIFilter filterWithName:@"CIDither"];
+    [dither setValue:input forKey:kCIInputImageKey];
+    [dither setValue:@0.7 forKey:@"inputIntensity"];
+    CIImage *dithered = dither.outputImage ?: input;
+    CIFilter *posterise = [CIFilter filterWithName:@"CIColorPosterize"];
+    [posterise setValue:dithered forKey:kCIInputImageKey];
+    [posterise setValue:@5 forKey:@"inputLevels"];
+    CIImage *out = posterise.outputImage ?: dithered;
+    CGImageRef made = [context createCGImage:out fromRect:out.extent];
+    UIImage *printed = made ? [UIImage imageWithCGImage:made scale:image.scale orientation:image.imageOrientation] : image;
+    if (made) CGImageRelease(made);
+    [cache setObject:printed forKey:key];
+    return printed;
+}
 
 // The card is the player screen drawn small, as the newer build of this mod draws it: the grabber and the two
 // glass buttons at the top, the cover in the middle, the album, the title and the artist under it, the slider
@@ -75,6 +107,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 @implementation SGRPlayerShowcase {
     SGRArtworkField *_field;
     SGAmbientView *_ambient;
+    UIImageView *_printed;   // the cover printed, for Animated without a clip
     UIView *_motion, *_visualiser;
     UIImageView *_cover;
     SGMarqueeLabel *_title, *_artist;
@@ -116,6 +149,13 @@ static NSArray<NSString *> *backgroundNotes(void) {
         _ambient.hidden = YES;
         if (_ambient) [self addSubview:_ambient];
     }
+
+    // The printed cover, when Animated has no clip to show: it stands where the field would.
+    _printed = [UIImageView new];
+    _printed.contentMode = UIViewContentModeScaleAspectFill;
+    _printed.clipsToBounds = YES;
+    _printed.hidden = YES;
+    [self addSubview:_printed];
 
     // The player's own chrome: the grabber it is pulled down by, and the two glass buttons beside it.
     _grabber = [UIView new];
@@ -313,7 +353,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_ambient.moving = shaderFluid && !SGPlayerState().isPaused;
         self->_field.hidden = shaderFluid;
         self->_field.flows = kind == SGRPlayerBackgroundColours;
-        self->_field.fluid = !shaderFluid && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
+        self->_field.fluid = !shaderFluid && !printed && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
         self->_field.aurora = kind == SGRPlayerBackgroundAurora;
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
@@ -321,6 +361,12 @@ static NSArray<NSString *> *backgroundNotes(void) {
         [self->_visualiser removeFromSuperview];
         self->_visualiser = kind == SGRPlayerBackgroundVisualiser ? SGRPlayerVisualiserPreview() : nil;
         if (self->_visualiser) [self insertSubview:self->_visualiser aboveSubview:self->_field];
+        BOOL printed = kind == SGRPlayerBackgroundAnimated && self->_motion == nil;
+        self->_printed.hidden = !printed;
+        if (printed) {
+            self->_printed.image = printedCover(self->_cover.image);
+            SGLog(@"artwork: printed cover, no clip for this song");
+        }
         self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil || self->_visualiser != nil;
     };
     self.accessibilityValue = [SGRPlayerBackgroundNames()[(NSUInteger)kind] stringByAppendingString:@" background"];
@@ -345,6 +391,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     CGFloat w = bounds.size.width, h = bounds.size.height;
     _field.frame = bounds;
     _field.backdropHeight = h;
+    _printed.frame = bounds;
     _ambient.frame = bounds;
     _motion.frame = bounds;
     _visualiser.frame = bounds;

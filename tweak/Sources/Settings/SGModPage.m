@@ -579,7 +579,9 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     self.title = title;
     _sections = sections;
     _shown = [self rowsToShow];
-    _intro = intro ? SGNote(intro) : nil;
+    // The grey restart note is gone from the pages the banner counts: the banner says the same thing, at the foot of
+    // the page, and only while something has actually been changed.
+    _intro = (intro && !_restartPage) ? SGNote(intro) : nil;
     _footer = footer ? SGNote(footer) : nil;
     // Any row with a value, a test of when it shows, a number or a menu keeps a ticker running: a page row's
     // value can move while the page shows (a download's percentage beside the chevron), a row can come or go

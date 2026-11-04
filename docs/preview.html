@@ -172,10 +172,9 @@
 
   /* ---------------- плеер ---------------- */
   .pcard {
-    height: 456px; margin: 0 16px 14px; border-radius: 22px; overflow: hidden;
+    height: 480px; margin: 0 16px 14px; border-radius: 26px; overflow: hidden;
     position: relative; background: #0a0a12;
-  }
-  .pfield { position: absolute; inset: 0; }
+  }  .pfield { position: absolute; inset: 0; }
   .pfield .layer { position: absolute; inset: 0; opacity: 0; transition: opacity .5s ease; }
   .pfield[data-bg="still"] .layer.still,
   .pfield[data-bg="colors"] .layer.fluid,
@@ -249,15 +248,15 @@
   .pfield[data-preset="calm"] .fluid { filter: blur(50px) saturate(.95) brightness(.92); }
   .pfield[data-preset="slow"] .fluid { filter: blur(52px) saturate(.9) brightness(.88); }
 
-  .pchrome { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 16px 20px 12px; }
-  .ptop { display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,.8); }
+  .pchrome { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 8px 20px 16px; }
+  .pgrabber { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.35); margin: 0 auto; }
+  .ptop { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; color: rgba(255,255,255,.85); }
   .pbtn {
-    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 13px;
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
     background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
   }
-  .pcrumb { font: 600 10px/1 -apple-system, sans-serif; letter-spacing: .8px; text-transform: uppercase; color: rgba(255,255,255,.65); }
   .pcover {
-    width: 208px; height: 208px; margin: 22px auto 0; border-radius: 10px;
+    width: 186px; height: 186px; margin: 16px auto 0; border-radius: 8px;
     background:
       radial-gradient(circle at 28% 22%, hsl(322 96% 62%) 0%, transparent 46%),
       radial-gradient(circle at 78% 30%, hsl(196 96% 58%) 0%, transparent 42%),
@@ -265,15 +264,14 @@
       conic-gradient(from 200deg at 50% 55%, #241038, #3a1042, #101a30, #241038);
     box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);
   }
-  .ptitle { margin-top: 18px; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
-  .partist { font-size: 14px; color: rgba(255,255,255,.55); margin-top: 2px; }
-  .pbar { margin-top: 14px; }
+  .palbum { margin-top: 12px; font-size: 10px; font-weight: 600; letter-spacing: .4px; text-align: center; color: rgba(255,255,255,.45); text-transform: uppercase; }
+  .ptitle { margin-top: 2px; font-size: 21px; font-weight: 600; letter-spacing: -.3px; text-align: center; }
+  .partist { font-size: 15px; color: rgba(255,255,255,.55); margin-top: 1px; text-align: center; }
+  .pbar { margin-top: 16px; padding: 0 8px; }
   .pbar .rail { height: 3px; border-radius: 2px; background: rgba(255,255,255,.24); }
   .pbar .rail i { display: block; height: 100%; width: 34%; background: #fff; border-radius: 2px; }
-  .pbar .times { display: flex; justify-content: space-between; margin-top: 7px; font-size: 10.5px; color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums; }
-  .pcontrols { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: rgba(255,255,255,.85); font-size: 15px; }
-  .pcontrols .play { width: 46px; height: 46px; border-radius: 50%; background: #fff; color: #000; display: grid; place-items: center; font-size: 16px; }
-  .plyric { margin-top: auto; font-size: 15px; font-weight: 600; color: rgba(255,255,255,.9); text-align: center; padding: 10px 0 2px; }
+  .pbar .times { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums; }
+  .pfoot { margin-top: auto; display: flex; justify-content: space-between; padding: 0 20px; color: rgba(255,255,255,.55); font-size: 14px; }
 
   /* выбор фона: восемь имён по 10 pt, в две строки по четыре */
   .bgs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 16px 12px; }
@@ -481,16 +479,17 @@ const pages = {
         <div class="layer grain"></div>
       </div>
       <div class="pchrome">
-        <div class="ptop"><div class="pbtn">⌄</div><div class="pcrumb">Liked songs</div><div class="pbtn">⋯</div></div>
+        <div class="pgrabber"></div>
+        <div class="ptop"><div class="pbtn">⌄</div><div class="pbtn">⋯</div></div>
         <div class="pcover"></div>
+        <div class="palbum">Graduation</div>
         <div class="ptitle">Flashing Lights</div>
         <div class="partist">Kanye West</div>
         <div class="pbar">
           <div class="rail"><i></i></div>
           <div class="times"><span>1:12</span><span>-2:17</span></div>
         </div>
-        <div class="pcontrols"><span>⇄</span><span>◀◀</span><span class="play">❚❚</span><span>▶▶</span><span>⟲</span></div>
-        <div class="plyric">Oh, I'm paranoid</div>
+        <div class="pfoot"><span>▤</span><span>☰</span><span>❞</span></div>
       </div>
     </div>
     <div class="bgs">
@@ -600,7 +599,8 @@ const NOTES = {
     title: "Player",
     where: "Redesigned/Player/PlayerSettings.m · PlayerField.x · PlayerPresetStrip.m",
     done: [
-      "Превью плеера живьём: тот же <code>SGRPlayerShowcase</code>, что и в твике, с настоящей обложкой и строкой трека.",
+      "Карточка — <b>экран плеера целиком</b>, как в новой сборке: грабер сверху, две стеклянные кнопки (⌄ и ⋯), обложка по центру, под ней альбом капителью, название 21 pt, артист, слайдер с прошедшим и оставшимся временем и футер с тремя кнопками. Высота 1.34 от ширины, было 0.5.",
+      "Превью живое: обложка, название, артист и альбом — настоящие, из <code>SGShownTrack</code>; прогресс — где трек был, когда страница открылась.",
       "<b>Восемь фонов</b> по 10 pt: Still · Colors · Fluid · Animated · Visualizer · Aurora · Black · Auto. Под полосой — строка о том, что выбранный фон делает; жми имена, и она меняется.",
       "<b>Пресеты</b> есть только у Fluid: строка появляется и исчезает вместе с выбором.",
       "<b>Aurora</b> переписана: не четыре шара, а занавеси света на чёрном — шесть полос, у каждой два цвета в противофазе, качание 7 + i·1.5 с. Стало ярче: насыщенность ×1.5, яркость ×2.8, пол 0.92.",

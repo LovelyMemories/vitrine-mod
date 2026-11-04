@@ -1,10 +1,12 @@
 // The redesign's Player page in Mod Settings (App/Pages.m opens it in place of the native look's).
 //
-// It leads with a card of the player as the now playing track shows on it: the background chosen on the
-// page edge to edge, and over its foot the cover, the title and the artist (gliding when too long) and how
-// far the track has played. The progress is where the track was when the page appeared. With no track, the
-// card shows the last one played (Shared/Player/SGLastTrack.h), its cover fetched and its Canvas looked up
-// as the playing one's would be, and with none ever played, Not Playing over a gradient of the accent.
+// It leads with a card of the player as the now playing track shows on it, drawn the way the newer build of this
+// mod draws it: the background chosen on the page edge to edge, the grabber and the two glass buttons at the top,
+// the cover in the middle, the album, the title and the artist (gliding when too long) under it, the slider with
+// how far the track has played and how much is left, and the foot with its three buttons. The progress is where
+// the track was when the page appeared. With no track, the card shows the last one played
+// (Shared/Player/SGLastTrack.h), its cover fetched and its Canvas looked up as the playing one's would be, and
+// with none ever played, Not Playing over a gradient of the accent.
 //
 // The background is the player's own: a field of the same kind (Still, Colors, Fluid), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
@@ -34,10 +36,19 @@
 #import "Player.h"
 #import "PlayerPresetStrip.h"
 
-// The card's height as a share of its width, kept between the two bounds.
-static const CGFloat kCardAspect = 0.5, kCardMinHeight = 168, kCardMaxHeight = 220;
+// The card is the player screen drawn small, as the newer build of this mod draws it: the grabber and the two
+// glass buttons at the top, the cover in the middle, the album, the title and the artist under it, the slider
+// with its two times, and the foot with its three buttons. Its height is a share of its width, kept in bounds.
+static const CGFloat kCardAspect = 1.34, kCardMinHeight = 400, kCardMaxHeight = 560;
 static const CGFloat kCardRadius = 26;   // continuous, the radius of the page's own cards and then some
-static const CGFloat kCardPadding = 16, kCoverSide = 64;
+static const CGFloat kCardPadding = 16;
+
+// A song's time, as the player writes it.
+static NSString *clockText(double seconds) {
+    if (!isfinite(seconds) || seconds < 0) return @"0:00";
+    NSInteger total = (NSInteger)lround(seconds);
+    return [NSString stringWithFormat:@"%ld:%02ld", (long)(total / 60), (long)(total % 60)];
+}
 
 // What each background does, in SGRPlayerBackgroundKind's order.
 static NSArray<NSString *> *backgroundNotes(void) {
@@ -64,6 +75,9 @@ static NSArray<NSString *> *backgroundNotes(void) {
     UIImageView *_cover;
     SGMarqueeLabel *_title, *_artist;
     UIView *_progress, *_progressFill;
+    UIView *_grabber, *_close, *_more, *_foot;
+    UILabel *_album, *_elapsed, *_remaining;
+    NSMutableArray<UIView *> *_footButtons;
     CGFloat _position;
     NSString *_artworkOf;   // the last track whose cover the card asked for
 }
@@ -84,6 +98,17 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _field.showsBackdrop = YES;
     [self addSubview:_field];
 
+    // The player's own chrome: the grabber it is pulled down by, and the two glass buttons beside it.
+    _grabber = [UIView new];
+    _grabber.backgroundColor = [UIColor colorWithWhite:1 alpha:0.35];
+    _grabber.layer.cornerRadius = 2;
+    _footButtons = [NSMutableArray array];
+    [self addSubview:_grabber];
+    _close = [self glassButton:@"chevron.down"];
+    _more = [self glassButton:@"ellipsis"];
+    [self addSubview:_close];
+    [self addSubview:_more];
+
     _cover = [UIImageView new];
     _cover.contentMode = UIViewContentModeScaleAspectFill;
     _cover.clipsToBounds = YES;
@@ -94,15 +119,24 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _cover.preferredSymbolConfiguration = [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightRegular];
     [self addSubview:_cover];
 
-    // The card reads as one image; the words glide as the player's own do.
+    // The card reads as one image; the words glide as the player's own do, and the album names what it is from.
+    _album = [UILabel new];
+    _album.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
+    _album.textColor = SGRTertiary();
+    _album.textAlignment = NSTextAlignmentCenter;
+    _album.lineBreakMode = NSLineBreakByTruncatingTail;
+    [self addSubview:_album];
+
     _title = [SGMarqueeLabel new];
     _title.textColor = SGRPrimary();
-    _title.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    _title.font = [UIFont systemFontOfSize:21 weight:UIFontWeightSemibold];
+    _title.textAlignment = NSTextAlignmentCenter;
     _title.isAccessibilityElement = NO;
     [self addSubview:_title];
     _artist = [SGMarqueeLabel new];
     _artist.textColor = SGRSecondary();
     _artist.font = [UIFont systemFontOfSize:15];
+    _artist.textAlignment = NSTextAlignmentCenter;
     _artist.isAccessibilityElement = NO;
     [self addSubview:_artist];
 
@@ -115,11 +149,48 @@ static NSArray<NSString *> *backgroundNotes(void) {
     [_progress addSubview:_progressFill];
     [self addSubview:_progress];
 
+    _elapsed = [self timeLabel];
+    _remaining = [self timeLabel];
+    _remaining.textAlignment = NSTextAlignmentRight;
+
+    // Under all of it, the player's foot: the speaker, the queue and the lyrics.
+    _foot = [UIView new];
+    [self addSubview:_foot];
+    for (NSString *symbol in @[@"hifispeaker", @"list.bullet", @"quote.bubble"]) {
+        UIImageView *glyph = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol]];
+        glyph.tintColor = SGRSecondary();
+        glyph.contentMode = UIViewContentModeScaleAspectFit;
+        glyph.tag = 7;
+        [_foot addSubview:glyph];
+        [_footButtons addObject:glyph];
+    }
+
     SGAddPlayerStateObserver(self);
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(artworkChanged) name:SGRNowPlayingArtworkDidChangeNotification object:nil];
     [self reloadTrack];
     [self reloadBackgroundAnimated:NO];
     return self;
+}
+
+- (UIView *)glassButton:(NSString *)symbol {
+    UIView *button = [UIView new];
+    button.backgroundColor = [UIColor colorWithWhite:1 alpha:0.14];
+    button.layer.cornerRadius = 15;
+    button.layer.cornerCurve = kCACornerCurveContinuous;
+    UIImageView *glyph = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol]];
+    glyph.tintColor = [UIColor colorWithWhite:1 alpha:0.85];
+    glyph.contentMode = UIViewContentModeScaleAspectFit;
+    glyph.tag = 7;
+    [button addSubview:glyph];
+    return button;
+}
+
+- (UILabel *)timeLabel {
+    UILabel *label = [UILabel new];
+    label.font = [UIFont monospacedDigitSystemFontOfSize:10 weight:UIFontWeightRegular];
+    label.textColor = SGRTertiary();
+    [self addSubview:label];
+    return label;
 }
 
 - (void)dealloc {
@@ -155,7 +226,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
     SGShownTrack *shown = SGShownTrackNow();
     _title.text = shown.title ?: @"Not Playing";
     _artist.text = shown.artist ?: @"";
+    _album.text = shown.album.length ? shown.album.uppercaseString : @"";
     _position = shown.current && state.duration > 0 ? MIN(1, MAX(0, state.position / state.duration)) : 0;
+    _elapsed.text = clockText(shown.current ? state.position : 0);
+    _remaining.text = clockText(shown.current && state.duration > 0 ? state.duration - state.position : 0);
     // The clip covers the field, and the hills move over it, which then holds still, as in the player.
     _field.motionHeld = state.isPaused || _motion != nil || _visualiser != nil;
     if (shown.current && SGRNowPlayingArtwork(NULL, NULL)) {
@@ -231,16 +305,34 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _motion.frame = bounds;
     _visualiser.frame = bounds;
 
-    _cover.frame = CGRectMake(kCardPadding, h - kCardPadding - kCoverSide, kCoverSide, kCoverSide);
-    CGFloat x = CGRectGetMaxX(_cover.frame) + 12, width = w - kCardPadding - x;
-    CGFloat line = 4, titleHeight = ceil(_title.font.lineHeight), artistHeight = ceil(_artist.font.lineHeight);
-    CGFloat bottom = CGRectGetMaxY(_cover.frame);
-    _progress.frame = CGRectMake(x, bottom - line - 2, width, line);
+    // The chrome at the top, then the cover in the middle of the card.
+    _grabber.frame = CGRectMake(round((w - 36) / 2), 8, 36, 4);
+    _close.frame = CGRectMake(16, 18, 30, 30);
+    _more.frame = CGRectMake(w - 46, 18, 30, 30);
+    for (UIView *button in @[_close, _more]) [button viewWithTag:7].frame = CGRectInset(button.bounds, 7, 7);
+
+    CGFloat side = MIN(w * 0.56, h * 0.40);
+    _cover.frame = CGRectMake(round((w - side) / 2), 64, side, side);
+
+    // Under it the album, the title and the artist, then the slider with its two times.
+    CGFloat textX = kCardPadding + 8, textWidth = w - 2 * textX;
+    CGFloat albumHeight = ceil(_album.font.lineHeight), titleHeight = ceil(_title.font.lineHeight), artistHeight = ceil(_artist.font.lineHeight);
+    _album.frame = CGRectMake(textX, CGRectGetMaxY(_cover.frame) + 12, textWidth, albumHeight);
+    _title.frame = CGRectMake(textX, CGRectGetMaxY(_album.frame) + 2, textWidth, titleHeight);
+    _artist.frame = CGRectMake(textX, CGRectGetMaxY(_title.frame) + 1, textWidth, artistHeight);
+    CGFloat line = 4, progressTop = CGRectGetMaxY(_artist.frame) + 16;
+    _progress.frame = CGRectMake(textX, progressTop, textWidth, line);
     _progress.layer.cornerRadius = line / 2;
-    _progressFill.frame = CGRectMake(0, 0, round(width * _position), line);
-    CGFloat textBottom = CGRectGetMinY(_progress.frame) - 10;
-    _artist.frame = CGRectMake(x, textBottom - artistHeight, width, artistHeight);
-    _title.frame = CGRectMake(x, CGRectGetMinY(_artist.frame) - titleHeight, width, titleHeight);
+    _progressFill.frame = CGRectMake(0, 0, round(textWidth * _position), line);
+    _elapsed.frame = CGRectMake(textX, CGRectGetMaxY(_progress.frame) + 3, 60, 12);
+    _remaining.frame = CGRectMake(CGRectGetMaxX(_progress.frame) - 60, CGRectGetMaxY(_progress.frame) + 3, 60, 12);
+
+    // The foot, at the card's bottom edge.
+    _foot.frame = CGRectMake(0, h - 46, w, 24);
+    for (NSUInteger i = 0; i < _footButtons.count; i++) {
+        CGFloat x = i == 0 ? 40 : i == 1 ? round(w / 2 - 10) : w - 60;
+        _footButtons[i].frame = CGRectMake(x, 2, 20, 20);
+    }
 }
 
 @end

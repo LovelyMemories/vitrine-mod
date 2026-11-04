@@ -33,6 +33,7 @@
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 #import "PlayerPresetStrip.h"
@@ -562,7 +563,9 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGSection(nil, @[sources, lowData]),
 
         SGSection(nil, @[SGWithSymbol(adjust, @"slider.horizontal.3")]),
-        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume),
+        SGNotedSection(@"Buttons", @[SGShownRow(@"Video button", @"Switch to video from the cover", SGKeyHideVideoSwitch)],
+                       @"The video button appears over the cover while the song has a video."),
+        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume slider", @"A slider under the controls for this iPhone, or the speaker's", SGRKeyPlayerVolume),
                                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover),
                                       SGSwitchRow(@"Only the music", nil, SGRKeyPlayerZen)],
                        @"Volume puts a slider under the controls for this iPhone, or the speaker's while Spotify plays on another device. "

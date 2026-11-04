@@ -29,6 +29,7 @@
 #import "Settings/SGPageStyle.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Kit/SGRFluid.h"
+#import "Redesigned/Kit/SGShader.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
@@ -71,6 +72,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 @implementation SGRPlayerShowcase {
     SGRArtworkField *_field;
+    SGAmbientView *_ambient;
     UIView *_motion, *_visualiser;
     UIImageView *_cover;
     SGMarqueeLabel *_title, *_artist;
@@ -97,6 +99,15 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _field = [[SGRArtworkField alloc] initWithFrame:frame];
     _field.showsBackdrop = YES;
     [self addSubview:_field];
+
+    // The Fluid background on the card: the newer build's ambient field, drawn by the shader in the cover's own
+    // two colours, over the field. Where Metal cannot, the field's own Core Animation Fluid is what shows.
+    if ([SGAmbientView metalAmbientAvailable]) {
+        _ambient = [[SGAmbientView alloc] initWithFrame:frame];
+        _ambient.amount = 0.25;
+        _ambient.hidden = YES;
+        if (_ambient) [self addSubview:_ambient];
+    }
 
     // The player's own chrome: the grabber it is pulled down by, and the two glass buttons beside it.
     _grabber = [UIView new];
@@ -218,6 +229,18 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _cover.image = image ?: placeholder;
     _cover.contentMode = UIViewContentModeScaleAspectFill;
     [_field setArtwork:_cover.image identity:image ? identity : @"placeholder" animated:self.window != nil];
+
+    // The ambient field takes the cover's own two colours, as the player's background does: the colour along its
+    // bottom edge for the light, the field colour made from it for the shade.
+    if (_ambient) {
+        __weak SGRPlayerShowcase *weakSelf = self;
+        [SGRPalette paletteForImage:_cover.image request:(SGRPaletteRequest){0} completion:^(SGRPalette *palette) {
+            SGRPlayerShowcase *showcase = weakSelf;
+            if (!palette.edgeColor || !showcase) return;
+            showcase->_ambient.topColor = palette.edgeColor;
+            showcase->_ambient.bottomColor = palette.fieldColor ?: palette.edgeColor;
+        }];
+    }
 }
 
 // The track, where it is and whether it plays, read again.
@@ -232,6 +255,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
     _remaining.text = clockText(shown.current && state.duration > 0 ? state.duration - state.position : 0);
     // The clip covers the field, and the hills move over it, which then holds still, as in the player.
     _field.motionHeld = state.isPaused || _motion != nil || _visualiser != nil;
+    // A paused song holds the ambient field still too, as it holds the field.
+    _ambient.moving = !_ambient.hidden && !state.isPaused;
     if (shown.current && SGRNowPlayingArtwork(NULL, NULL)) {
         [self artworkChanged];
     } else if (!shown.current && shown.artworkURL) {
@@ -272,8 +297,15 @@ static NSArray<NSString *> *backgroundNotes(void) {
         if (showcase.window && !showcase->_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [showcase reloadBackgroundAnimated:YES];
     };
     void (^apply)(void) = ^{
+        // Fluid is the shader's on this card where the device has Metal: the ambient field in the cover's own
+        // colours, which is what the newer build shows. The field keeps its own Fluid for every other use, and
+        // stands in here where Metal cannot.
+        BOOL shaderFluid = self->_ambient != nil && kind == SGRPlayerBackgroundFluid;
+        self->_ambient.hidden = !shaderFluid;
+        self->_ambient.moving = shaderFluid && !SGPlayerState().isPaused;
+        self->_field.hidden = shaderFluid;
         self->_field.flows = kind == SGRPlayerBackgroundColours;
-        self->_field.fluid = kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser;
+        self->_field.fluid = !shaderFluid && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
         self->_field.aurora = kind == SGRPlayerBackgroundAurora;
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
@@ -302,6 +334,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     CGFloat w = bounds.size.width, h = bounds.size.height;
     _field.frame = bounds;
     _field.backdropHeight = h;
+    _ambient.frame = bounds;
     _motion.frame = bounds;
     _visualiser.frame = bounds;
 

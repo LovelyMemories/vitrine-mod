@@ -200,25 +200,101 @@ UIView *SGAppIconStrip(void) {
     return strip;
 }
 
+// The page the All icons row opens, the way the newer build has one (SGAppIconPage): every alternate the IPA
+// carries, four to a row, the one in effect ringed in the accent. A tap switches and rings where the finger is,
+// it, without leaving the page; the strip on the Appearance page repaints with it, since both read iOS. A page of
+// the mod's own goes through SGPage, which is what the navigation stack it is pushed onto takes.
+@interface SGAppIconPickerPage : SGPage
+@end
+
+@implementation SGAppIconPickerPage {
+    UIScrollView *_scroll;
+    NSMutableArray<NSString *> *_names;   // NSNull for the app's own
+    NSMutableArray<UIControl *> *_cells;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = UIColor.blackColor;
+    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    self.title = @"App icons";
+    _names = [NSMutableArray arrayWithObject:(NSString *)NSNull.null];
+    [_names addObjectsFromArray:iconNames()];
+    _cells = [NSMutableArray array];
+    _scroll = [UIScrollView new];
+    [self.view addSubview:_scroll];
+    for (NSUInteger i = 0; i < _names.count; i++) {
+        UIControl *cell = [UIControl new];
+        cell.tag = (NSInteger)i;
+        [cell addTarget:self action:@selector(tapped:) forControlEvents:UIControlEventTouchUpInside];
+        UIImageView *picture = [UIImageView new];
+        picture.image = preview(_names[i]);
+        picture.contentMode = UIViewContentModeScaleAspectFit;
+        picture.layer.cornerRadius = 15;
+        picture.layer.cornerCurve = kCACornerCurveContinuous;
+        picture.clipsToBounds = YES;
+        picture.tag = 1;
+        picture.userInteractionEnabled = NO;
+        [cell addSubview:picture];
+        UILabel *title = [UILabel new];
+        title.text = label(_names[i]);
+        title.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+        title.textColor = [UIColor colorWithWhite:1 alpha:0.6];
+        title.textAlignment = NSTextAlignmentCenter;
+        title.lineBreakMode = NSLineBreakByTruncatingTail;
+        title.tag = 2;
+        title.userInteractionEnabled = NO;
+        [cell addSubview:title];
+        cell.accessibilityLabel = label(_names[i]);
+        [_scroll addSubview:cell];
+        [_cells addObject:cell];
+    }
+    [self paint];
+}
+
+- (void)paint {
+    NSString *current = UIApplication.sharedApplication.alternateIconName;
+    for (UIControl *cell in _cells) {
+        NSString *name = nameOf(_names[(NSUInteger)cell.tag]);
+        BOOL on = current ? [name isEqualToString:current] : name == nil;
+        cell.layer.borderWidth = on ? 2 : 0;
+        cell.layer.borderColor = SGGreen().CGColor;
+        cell.layer.cornerRadius = 20;
+    }
+}
+
+- (void)tapped:(UIControl *)cell {
+    id name = _names[(NSUInteger)cell.tag];
+    setIcon([name isKindOfClass:NSNull.class] ? nil : name);
+    [self paint];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGRect bounds = self.view.bounds;
+    CGFloat inset = 16, gap = 14, columns = 4;
+    CGFloat cellWidth = floor((CGRectGetWidth(bounds) - 2 * inset - (columns - 1) * gap) / columns);
+    CGFloat cellHeight = cellWidth + 22;
+    _scroll.frame = bounds;
+    _scroll.contentInset = UIEdgeInsetsMake(16, 0, 32, 0);
+    CGFloat x = inset, y = 16;
+    for (NSUInteger i = 0; i < _cells.count; i++) {
+        UIControl *cell = _cells[i];
+        cell.frame = CGRectMake(x, y, cellWidth, cellHeight);
+        [cell viewWithTag:1].frame = CGRectMake(0, 0, cellWidth, cellWidth);
+        [cell viewWithTag:2].frame = CGRectMake(-4, cellWidth + 4, cellWidth + 8, 16);
+        x += cellWidth + gap;
+        if ((i + 1) % (NSUInteger)columns == 0) { x = inset; y += cellHeight + gap; }
+    }
+    _scroll.contentSize = CGSizeMake(CGRectGetWidth(bounds), y + cellHeight + 16);
+}
+
+@end
+
 SGModRow *SGAppIconCountRow(void) {
     NSArray<NSString *> *names = iconNames();
     if (!names.count || !UIApplication.sharedApplication.supportsAlternateIcons) return nil;
-    SGModRow *row = SGActionRow(@"All icons", nil, ^{
-        // The icon in effect is ticked, so the sheet can be read without switching to see what is on. No
-        // pictures here: a UIAlertAction takes one only through a key UIKit does not publish, and a throw there
-        // would take the page down. The strip above is the one with the pictures.
-        UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"App icon" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-        void (^add)(NSString *) = ^(NSString *name) {
-            NSString *current = UIApplication.sharedApplication.alternateIconName;
-            BOOL on = current ? [name isEqualToString:current] : name == nil;
-            NSString *title = on ? [@"✓ " stringByAppendingString:label(name)] : label(name);
-            [sheet addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *chosen) { setIcon(name); }]];
-        };
-        add(nil);
-        for (NSString *name in names) add(name);
-        [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [SGTopController() presentViewController:sheet animated:YES completion:nil];
-    });
+    SGModRow *row = SGPageRow(@"All icons", ^{ return (UIViewController *)[SGAppIconPickerPage new]; });
     row.value = ^NSString *{ return [@(names.count) stringValue]; };
     return row;
 }

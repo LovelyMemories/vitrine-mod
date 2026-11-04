@@ -631,7 +631,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
 
-        SGSection(nil, @[SGWithSymbol(adjust, @"slider.horizontal.3")]),
+        SGSection(nil, @[adjust]),   // no symbol: a row with one is drawn as a tile, which took the page down
         SGNotedSection(@"Buttons", @[SGShownRow(@"Video button", @"Switch to video from the cover", SGKeyHideVideoSwitch)],
                        @"The video button appears over the cover while the song has a video."),
         SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume slider", @"A slider under the controls for this iPhone, or the speaker's", SGRKeyPlayerVolume),

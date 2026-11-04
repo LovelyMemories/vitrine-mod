@@ -89,6 +89,15 @@
   .wide { margin-top:auto; height:96px; border-radius:12px; background:linear-gradient(135deg,#6b2fa8,#1b1440); position:relative; }
   .wide .t { position:absolute; left:12px; bottom:10px; font-size:14px; font-weight:700; }
 
+  .printed-demo { display:flex; gap:12px; margin:0 16px 16px; }
+  .printed-demo .half { flex:1; text-align:center; }
+  .printed-demo .cov { height:118px; border-radius:12px;
+    background:radial-gradient(circle at 30% 25%, #ff4fa3, transparent 55%), radial-gradient(circle at 75% 35%, #31c7f5, transparent 50%),
+               radial-gradient(circle at 50% 85%, #8a4bff, transparent 60%), #241038; }
+  .printed-demo .printed { filter:url(#sgPosterize) contrast(1.45) saturate(.75); position:relative; }
+  .printed-demo .printed::after { content:""; position:absolute; inset:0; border-radius:12px; opacity:.5;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='1' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>"); }
+  .printed-demo .cap { font-size:10.5px; color:rgba(255,255,255,.55); margin-top:6px; line-height:1.35; }
   .panel { width:340px; flex:0 0 auto; }
   .panel h2 { margin:0 0 4px; font-size:19px; }
   .panel .lede { margin:0 0 18px; font-size:12.5px; color:rgba(255,255,255,.45); line-height:1.5; }
@@ -105,6 +114,9 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="sgPosterize"><feComponentTransfer>
+  <feFuncR type="discrete" tableValues="0 .25 .5 .75 1"/><feFuncG type="discrete" tableValues="0 .25 .5 .75 1"/><feFuncB type="discrete" tableValues="0 .25 .5 .75 1"/>
+</feComponentTransfer></filter></svg>
 
 <div class="phone"><div class="screen" id="screen"></div></div>
 
@@ -158,6 +170,10 @@ const pages = {
       ${[["Still",""],["Colors",""],["Fluid","on"],["Animated",""],["Visualizer","wave"],["Aurora",""],["Black",""],["Auto",""]]
         .map(([n, cls]) => `<div class="bg ${cls === 'on' ? 'on' : ''}"><div class="pic">${cls === 'wave' ? '<div class="wave"></div>' : ''}</div><div class="n">${n}</div></div>`).join("")}
     </div>
+    <div class="printed-demo">
+      <div class="half"><div class="cov"></div><div class="cap">Animated, у трека есть клип</div></div>
+      <div class="half"><div class="cov printed"></div><div class="cap">Animated, клипа нет — обложка «напечатана»</div></div>
+    </div>
     <div class="card">
       <div class="row"><div class="grow">Sources</div><div class="value">Spotify Canvas, Apple Music</div><div class="chev">›</div></div>
     </div>
@@ -209,7 +225,7 @@ const NOTES = {
   albums: ["<b>Обложка во всю карточку</b>, название, артист и <code>Album · 2024</code> поверх неё, кнопки <b>shuffle · ▶ Play · +</b> — как на их странице.",
            "<b>Artist picture</b> — новый переключатель (коммит <code>c46b559</code>): фото артиста берётся из Spotify'вской <code>ParentRow</code>, ключ читается при каждой раскладке, так что работает без перезапуска.",
            "Порядок секций и названия — их: Artist picture → Animated covers → Low Data → Album artist on every track → секции под треками."],
-  player: ["<b>Фоны карточками с превью обложки</b> вместо строки из восьми названий: у каждого свой вид (Visualizer — двумя гребнями, Aurora — занавесями, Black — чёрным).",
+  player: ["<b>Animated</b> без клипа печатает обложку: Core Image дизерит и срезает градации (<code>5f9f63a</code>).", "<b>Фоны карточками с превью обложки</b> вместо строки из восьми названий: у каждого свой вид (Visualizer — двумя гребнями, Aurora — занавесями, Black — чёрным).",
            "<b>Sources</b> показывается при любом фоне и говорит <code>Spotify Canvas, Apple Music</code>.",
            "<b>Adjust</b> — шесть чисел Fluid отдельной страницей, <b>Buttons</b> и <b>Volume slider</b> — как у них.",
            "На самой карточке при Fluid работает <b>шейдерное поле</b>: оно вынесено из анимируемой вьюхи (это был источник двух падений) и рисуется слоем над таблицей, вполсилы."],

@@ -763,20 +763,29 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     // pushed one keeps them.
     SGPageShowLargeTitle(self);
     // A strip of pictures, the first thing on the page: a card of its own above the rows, with the page's intro
-    // under it, so both read as one header.
-    if (self.iconStrip && !self.iconStrip.superview) {
+    // under it, so both read as one header. The accent strip, when the page has one, sits under the icons in it.
+    if ((self.iconStrip || self.accentStrip) && !(self.iconStrip.superview || self.accentStrip.superview)) {
         UITableView *table = self.tableView;
         CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
         UIView *header = [UIView new];
-        self.iconStrip.frame = CGRectMake(inset, 12, width - 2 * inset, self.iconStrip.frame.size.height);
-        [header addSubview:self.iconStrip];
+        CGFloat top = 12;
+        if (self.iconStrip) {
+            self.iconStrip.frame = CGRectMake(inset, top, width - 2 * inset, self.iconStrip.frame.size.height);
+            [header addSubview:self.iconStrip];
+            top = CGRectGetMaxY(self.iconStrip.frame) + 10;
+        }
+        if (self.accentStrip) {
+            self.accentStrip.frame = CGRectMake(inset, top, width - 2 * inset, self.accentStrip.frame.size.height);
+            [header addSubview:self.accentStrip];
+            top = CGRectGetMaxY(self.accentStrip.frame);
+        }
         UIView *intro = _intro;
         if (intro) {
-            intro.frame = CGRectMake(inset, CGRectGetMaxY(self.iconStrip.frame) + 6, width - 2 * inset, intro.frame.size.height);
+            intro.frame = CGRectMake(inset, top + 6, width - 2 * inset, intro.frame.size.height);
             [header addSubview:intro];
             table.tableHeaderView = nil;
         }
-        header.frame = CGRectMake(0, 0, width, CGRectGetMaxY(intro ? intro.frame : self.iconStrip.frame) + 8);
+        header.frame = CGRectMake(0, 0, width, (intro ? CGRectGetMaxY(intro.frame) : top) + 8);
         table.tableHeaderView = header;
     }
     // Reloaded whether or not anything ticks: a choice row is showing whatever was picked on the

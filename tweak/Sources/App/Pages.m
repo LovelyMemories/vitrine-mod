@@ -24,6 +24,7 @@
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Redesigned/Kit/SGRAccent.h"
+#import "Redesigned/Kit/SGRAccentStrip.h"
 
 NSString *const SGRedesignedUIInfo = @"The newest version of Vitrine, leaning toward Apple Music's style. It is not compatible with the legacy look's settings.\n\nThe legacy look gives you more freedom, yet still looks like Spotify.";
 
@@ -103,6 +104,8 @@ UIViewController *SGAppearancePage(void) {
         SGSection(nil, everywhere),
     ] footer:nil];
     if (strip) page.iconStrip = strip;
+    // The accent colours above the rows, the way the redesign offers them: a tap each, the picker below for the rest.
+    if (SGRedesignedUIStored()) page.accentStrip = SGRAccentStrip();
     return page;
 }
 

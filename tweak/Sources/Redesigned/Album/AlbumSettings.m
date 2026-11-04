@@ -29,7 +29,7 @@
     UITableView *table = self.tableView;
     CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
     CGFloat cardWidth = width - 2 * inset;
-    self.showcase.frame = CGRectMake(inset, 16, cardWidth, round(cardWidth * 0.62));
+    self.showcase.frame = CGRectMake(inset, 16, cardWidth, round(cardWidth * 1.25));
     CGSize size = CGSizeMake(width, CGRectGetMaxY(self.showcase.frame) + 8);
     if (CGSizeEqualToSize(_header.bounds.size, size)) return;
     _header.frame = (CGRect){CGPointZero, size};

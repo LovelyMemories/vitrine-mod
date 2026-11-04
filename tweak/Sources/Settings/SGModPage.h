@@ -69,6 +69,9 @@
 // A strip of pictures at the top of the page, above the intro and the first card (the Appearance page's app
 // icons): placed in a header of its own when the page first appears. nil for none.
 @property (nonatomic, strong) UIView *iconStrip;
+// A second strip under it, of the same shape (the Appearance page's accent colours): placed with the icons, or
+// alone, in the same header. nil for none.
+@property (nonatomic, strong) UIView *accentStrip;
 // Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
 - (void)refreshVisibility;
 // Rows draw their symbol on a colored tile; off, the default, they show none. Mod Settings' main page has them.

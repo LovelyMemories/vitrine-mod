@@ -15,11 +15,12 @@ static NSString *const kFirstShelf = @"First shelf";
 @end
 
 @implementation SGRHomeShowcase {
-    UIView *_card;
-    UILabel *_title;
+    UIView *_card, *_ambient, *_play;
+    UILabel *_title, *_ambientTitle;
     UIView *_pill, *_avatar;
     UIView *_row;
     NSArray<UIView *> *_tiles;
+    NSArray<UILabel *> *_names, *_lines;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -36,7 +37,7 @@ static NSString *const kFirstShelf = @"First shelf";
     CAGradientLayer *wash = [CAGradientLayer layer];
     wash.colors = @[(id)SGColorRGB(0x2547C8).CGColor, (id)SGColorRGB(0x12246B).CGColor];
     wash.startPoint = CGPointMake(0, 0);
-    wash.endPoint = CGPointMake(1, 1);
+    wash.endPoint = CGPointMake(0.6, 1);
     [_card.layer addSublayer:wash];
     _card.layer.cornerRadius = 18;
     _card.layer.cornerCurve = kCACornerCurveContinuous;
@@ -61,18 +62,70 @@ static NSString *const kFirstShelf = @"First shelf";
     _avatar.layer.cornerRadius = 15;
     [_pill addSubview:_avatar];
 
+    // The first shelf: four cards of Home's own, a cover each and the two lines under it, running off the edge.
     _row = [UIView new];
     [_card addSubview:_row];
     NSMutableArray<UIView *> *tiles = [NSMutableArray array];
-    for (NSInteger i = 0; i < 3; i++) {
-        UIView *tile = [UIView new];
-        tile.backgroundColor = i == 0 ? SGColorRGB(0x3B5BD8) : [UIColor colorWithWhite:1 alpha:0.55];
-        tile.layer.cornerRadius = 12;
-        tile.layer.cornerCurve = kCACornerCurveContinuous;
-        [_row addSubview:tile];
-        [tiles addObject:tile];
+    NSMutableArray<UILabel *> *names = [NSMutableArray array], *lines2 = [NSMutableArray array];
+    NSArray<NSString *> *titles = @[@"Two picks", @"For you", @"Lately", @"Bright"];
+    NSArray<NSString *> *subtitles = @[@"Made for you", @"Your mix", @"Played a lot", @"New"];
+    for (NSInteger i = 0; i < 4; i++) {
+        UIView *cell = [UIView new];
+        UIView *cover = [UIView new];
+        cover.backgroundColor = i == 0 ? SGColorRGB(0x3B5BD8) : [UIColor colorWithWhite:1 alpha:0.55];
+        cover.layer.cornerRadius = 8;
+        cover.layer.cornerCurve = kCACornerCurveContinuous;
+        cover.tag = 1;
+        [cell addSubview:cover];
+        UILabel *name = [UILabel new];
+        name.text = titles[i];
+        name.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+        name.textColor = UIColor.whiteColor;
+        name.lineBreakMode = NSLineBreakByTruncatingTail;
+        [cell addSubview:name];
+        UILabel *line = [UILabel new];
+        line.text = subtitles[i];
+        line.font = [UIFont systemFontOfSize:10 weight:UIFontWeightRegular];
+        line.textColor = [UIColor colorWithWhite:1 alpha:0.6];
+        line.lineBreakMode = NSLineBreakByTruncatingTail;
+        [cell addSubview:line];
+        [_row addSubview:cell];
+        [tiles addObject:cell];
+        [names addObject:name];
+        [lines2 addObject:line];
     }
     _tiles = tiles;
+    _names = names;
+    _lines = lines2;
+
+    // Under the shelf, one of Home's wide cards: a scene, its name over it and a play glyph in a glass circle.
+    _ambient = [UIView new];
+    _ambient.backgroundColor = SGColorRGB(0x2A1B5E);
+    _ambient.layer.cornerRadius = 12;
+    _ambient.layer.cornerCurve = kCACornerCurveContinuous;
+    _ambient.clipsToBounds = YES;
+    CAGradientLayer *scene = [CAGradientLayer layer];
+    scene.colors = @[(id)SGColorRGB(0x6B2FA8).CGColor, (id)SGColorRGB(0x1B1440).CGColor];
+    scene.startPoint = CGPointMake(0, 0);
+    scene.endPoint = CGPointMake(1, 1);
+    [_ambient.layer addSublayer:scene];
+    [_card addSubview:_ambient];
+    _ambientTitle = [UILabel new];
+    _ambientTitle.text = @"Your week";
+    _ambientTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    _ambientTitle.textColor = UIColor.whiteColor;
+    [_ambient addSubview:_ambientTitle];
+    _play = [UIView new];
+    _play.backgroundColor = [UIColor colorWithWhite:1 alpha:0.2];
+    _play.layer.cornerRadius = 15;
+    UILabel *glyph = [UILabel new];
+    glyph.text = @"▶";
+    glyph.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    glyph.textColor = UIColor.whiteColor;
+    glyph.textAlignment = NSTextAlignmentCenter;
+    glyph.tag = 9;
+    [_play addSubview:glyph];
+    [_ambient addSubview:_play];
     return self;
 }
 
@@ -82,14 +135,35 @@ static NSString *const kFirstShelf = @"First shelf";
     CGFloat inset = 8;
     _card.frame = CGRectMake(inset, inset, width - 2 * inset, height - inset);
     _card.layer.sublayers.firstObject.frame = _card.bounds;
-    _title.frame = CGRectMake(18, 10, 160, 42);
-    _pill.frame = CGRectMake(CGRectGetWidth(_card.bounds) - 108, 14, 96, 34);
+    CGFloat cardWidth = CGRectGetWidth(_card.bounds), cardHeight = CGRectGetHeight(_card.bounds);
+    _title.frame = CGRectMake(16, 10, 200, 42);
+    _pill.frame = CGRectMake(cardWidth - 108, 14, 96, 34);
     ((UIView *)_pill.subviews.firstObject).frame = CGRectMake(12, 10, 22, 14);
     _avatar.frame = CGRectMake(64, 2, 30, 30);
-    CGFloat rowTop = CGRectGetMaxY(_title.frame) + 6, rowHeight = CGRectGetHeight(_card.bounds) - rowTop - 12;
-    _row.frame = CGRectMake(18, rowTop, CGRectGetWidth(_card.bounds) - 36, rowHeight);
-    CGFloat tileWidth = (CGRectGetWidth(_row.bounds) - 2 * 10) / 2.4;
-    for (NSUInteger i = 0; i < _tiles.count; i++) _tiles[i].frame = CGRectMake(i * (tileWidth + 10), 0, tileWidth, rowHeight);
+
+    // The shelf: four covers across, the fourth cut by the card's edge.
+    CGFloat rowTop = CGRectGetMaxY(_title.frame) + 4, side = 16;
+    CGFloat inner = cardWidth - 2 * side;
+    CGFloat tileWidth = (inner - 3 * 10) / 3.6;
+    CGFloat coverSide = MIN(tileWidth, cardHeight * 0.24);
+    CGFloat rowHeight = coverSide + 30;
+    _row.frame = CGRectMake(side, rowTop, inner, rowHeight);
+    for (NSUInteger i = 0; i < _tiles.count; i++) {
+        UIView *cell = _tiles[i];
+        cell.frame = CGRectMake(i * (tileWidth + 10), 0, tileWidth, rowHeight);
+        UIView *cover = [cell viewWithTag:1];
+        cover.frame = CGRectMake(0, 0, coverSide, coverSide);
+        _names[i].frame = CGRectMake(0, coverSide + 5, tileWidth, 13);
+        _lines[i].frame = CGRectMake(0, coverSide + 18, tileWidth, 12);
+    }
+
+    // The wide card takes what is left under the shelf.
+    CGFloat ambientTop = CGRectGetMaxY(_row.frame) + 10;
+    _ambient.frame = CGRectMake(side, ambientTop, inner, MAX(48, cardHeight - ambientTop - 12));
+    _ambient.layer.sublayers.firstObject.frame = _ambient.bounds;
+    _ambientTitle.frame = CGRectMake(12, CGRectGetHeight(_ambient.bounds) - 26, CGRectGetWidth(_ambient.bounds) - 60, 18);
+    _play.frame = CGRectMake(CGRectGetWidth(_ambient.bounds) - 42, CGRectGetHeight(_ambient.bounds) - 38, 30, 30);
+    [_play viewWithTag:9].frame = _play.bounds;
 }
 
 @end
@@ -115,7 +189,7 @@ static NSString *const kFirstShelf = @"First shelf";
     UITableView *table = self.tableView;
     CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left;
     CGFloat cardWidth = width - 2 * inset;
-    self.showcase.frame = CGRectMake(inset, 16, cardWidth, round(cardWidth * 0.62));
+    self.showcase.frame = CGRectMake(inset, 16, cardWidth, round(cardWidth * 0.95));
     CGSize size = CGSizeMake(width, CGRectGetMaxY(self.showcase.frame) + 8);
     if (CGSizeEqualToSize(_header.bounds.size, size)) return;
     _header.frame = (CGRect){CGPointZero, size};

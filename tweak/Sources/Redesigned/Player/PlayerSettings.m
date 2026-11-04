@@ -353,7 +353,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_ambient.moving = shaderFluid && !SGPlayerState().isPaused;
         self->_field.hidden = shaderFluid;
         self->_field.flows = kind == SGRPlayerBackgroundColours;
-        self->_field.fluid = !shaderFluid && !printed && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
+        self->_field.fluid = !shaderFluid && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
         self->_field.aurora = kind == SGRPlayerBackgroundAurora;
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;

@@ -23,3 +23,8 @@ BOOL SGRPlainCheckOn(void);
 
 @class SGModRow;
 NSArray<SGModRow *> *SGRAppearanceRows(void);   // the accent color, for the Appearance page
+
+// Accent from the cover (SGRAccentCover.m), as the newer build has it: while it is on, the accent is taken from the
+// cover of the song playing, and the colour picked by hand is kept for when it goes off.
+#define SGRKeyAccentFromCover @"spotifyglass.redesign.accent.fromCover"
+void SGRAccentFromCoverSet(BOOL on);

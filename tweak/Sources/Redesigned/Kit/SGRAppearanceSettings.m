@@ -17,7 +17,12 @@ NSArray<SGModRow *> *SGRAppearanceRows(void) {
         });
     });
     colour.swatch = ^UIColor *{ return SGColorRGB(SGRAccentRGB()); };
+    // Their switch, in their words: the player's accent follows the cover of the song playing, and the colour picked
+    // by hand is what it comes back to.
+    SGModRow *cover = SGOptionRow(@"Accent from the cover", @"The player's accent colour can follow the cover of the song playing.", SGRKeyAccentFromCover);
+    cover.changed = ^(BOOL on) { SGRAccentFromCoverSet(on); };
     return @[
+        SGWithSymbol(cover, @"photo"),
         SGWithSymbol(colour, @"eyedropper"),
         SGWithSymbol(SGOptionRow(@"Plain checkmark", @"A saved song's tick without its circle, in the accent", SGRKeyPlainCheck), @"checkmark"),
     ];

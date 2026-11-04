@@ -13,6 +13,12 @@ on:
         type: choice
         options: [artifacts, filebin, both]
 
+# One build at a time: a second run of this workflow cancels the one before it, which is what keeps the queue
+# from filling with runs of the same branch while a macOS runner is scarce.
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   THEOS: ${{ github.workspace }}/theos
   HOMEBREW_NO_AUTO_UPDATE: 1

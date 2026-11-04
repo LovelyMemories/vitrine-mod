@@ -318,7 +318,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil || self->_visualiser != nil;
     };
     self.accessibilityValue = [SGRPlayerBackgroundNames()[(NSUInteger)kind] stringByAppendingString:@" background"];
-    if (animated && self.window) {
+    // A cross-fade of the whole card is a snapshot of its layer tree, and a Metal view's layer cannot be
+    // snapshotted that way: with the ambient field in the card the change goes in plainly, and its colours and
+    // rate change under the finger instead.
+    if (animated && self.window && !_ambient) {
         // A crossfade, which Reduce Motion keeps: nothing moves.
         [UIView transitionWithView:self duration:SGRCrossfade options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent
                         animations:apply completion:nil];

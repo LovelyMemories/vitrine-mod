@@ -186,7 +186,8 @@ static void setIcon(NSString *icon) {
         UIView *picture = [cell viewWithTag:1];
         picture.frame = CGRectInset(picture.frame, on ? 4 : 0, on ? 4 : 0);
     }
-    self.frame = CGRectMake(self.frame.origin.x, self.frame.origin.y, self.frame.size.width, size + 2 * inset);
+    // As tall as the run is: the inset above it, the pictures, their names under them, and the inset below.
+    self.frame = CGRectMake(self.frame.origin.x, self.frame.origin.y, self.frame.size.width, size + labelHeight + 4 + 2 * inset);
 }
 
 @end

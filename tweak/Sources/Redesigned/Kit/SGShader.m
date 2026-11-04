@@ -324,4 +324,8 @@ typedef struct {
     [buffer commit];
 }
 
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+    // Nothing to rebuild: the shader reads the size from the uniforms each frame.
+}
+
 @end

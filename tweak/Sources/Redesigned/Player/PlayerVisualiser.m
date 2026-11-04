@@ -28,6 +28,7 @@
 // Threading: main thread only, but for the reader, which runs on the render thread.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Kit/SGShader.h"
 #import "Shared/AudioEffects/AudioEffects.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "Shared/Player/PlayerState.h"
@@ -109,6 +110,7 @@ static NSDictionary *noActions(void) {
 
 @implementation SGRVisualiserView {
     UIView *_content;   // the hills, faded in and out as one
+    SGHillsView *_hills;   // the same hills on Metal, where the device has it
     CAGradientLayer *_backFill, *_frontFill;
     CAShapeLayer *_backShape, *_frontShape;
     CAGradientLayer *_crestFade;   // the content's mask: clear at the tallest crest, opaque over the foot
@@ -172,6 +174,15 @@ static UIColor *lit(UIColor *color, CGFloat luminance) {
     _frontFill = fill(_frontShape);
     [_content.layer addSublayer:_frontFill];
     [self addSubview:_content];
+    // The hills on Metal where the device has it: the same two hills, drawn per pixel instead of as a path the
+    // app rebuilds every frame. The drawn ones stay in place, hidden, and come back where the shader is missing.
+    if ([SGHillsView metalHillsAvailable]) {
+        _hills = [[SGHillsView alloc] initWithFrame:frame];
+        if (_hills) {
+            _content.hidden = YES;
+            [self insertSubview:_hills aboveSubview:_content];
+        }
+    }
     _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     [self addSubview:_lyricsBlur];
@@ -204,6 +215,12 @@ static UIColor *lit(UIColor *color, CGFloat luminance) {
     if (colors.count < 5) return;
     _frontFill.colors = @[(id)lit(colors[2], kGlow).CGColor, (id)lit(colors[4], kGlow).CGColor, (id)lit(colors[3], kGlow).CGColor];
     _backFill.colors = @[(id)lit(colors[0], kGlow).CGColor, (id)lit(colors[1], kGlow).CGColor];
+    // The shader takes the two colours as a pair rather than as gradients: the front hill from the cover's whole
+    // colour and the back one from its top left, the two the drawn hills are made of.
+    if (_hills) {
+        _hills.frontColor = lit(colors[4], kGlow);
+        _hills.backColor = lit(colors[0], kGlow);
+    }
 }
 
 - (void)artworkChanged {
@@ -323,6 +340,7 @@ static UIColor *lit(UIColor *color, CGFloat luminance) {
 }
 
 - (void)setMoving:(BOOL)moving {
+    _hills.moving = moving;
     if (moving) {
         if (!_link) {
             _link = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
@@ -433,6 +451,12 @@ static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloa
 - (void)draw {
     CGRect bounds = self.bounds;
     if (bounds.size.width <= 0 || bounds.size.height <= 0) return;
+    // On Metal the bands go to the shader and it draws both hills: same bands, same two colours, no path.
+    if (_hills) {
+        _hills.frame = bounds;
+        [_hills setLevels:_front count:kBands];
+        return;
+    }
     CGFloat baseline = _baseline > 0 ? _baseline : bounds.size.height;
     CGFloat screen = _screenHeight > 0 ? _screenHeight : bounds.size.height;
     CGFloat foot = MAX(baseline, bounds.size.height), rest = round(screen * kRestHeight);

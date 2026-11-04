@@ -41,6 +41,7 @@
 UIViewController *SGRAlbumSettingsPage(void) {
     SGRAlbumPage *page = [[SGRAlbumPage alloc] initWithTitle:@"Albums" intro:SGRestartNote sections:@[
         SGNotedSection(nil, @[
+            SGSwitchRow(@"Artist picture", @"The artist's photo before their name on an album's page", SGRKeyAlbumArtistPicture),
             SGSwitchRow(@"Animated covers", @"At the top of an album that has one, about 5 MB each", SGRKeyAlbumMotion),
             SGOptionRow(@"Download in Low Data Mode", nil, SGKeyMotionLowData),
         ], @"Only the album's name is sent to Apple Music. A cover stays still in Low Power Mode."),

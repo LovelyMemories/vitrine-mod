@@ -467,8 +467,10 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page, NSString **artist,
     // whole line however many artists are on the album, so several of them open Spotify's own picker
     // (issue #56).
     [info showCreatorLink:parent];
-    // And the artist's picture before the name, the one Spotify draws at the start of the row.
-    [info showCreatorPicture:SGRCreatorPicture(parent)];
+    // And the artist's picture before the name, the one Spotify draws at the start of the row -- unless the page's
+    // Artist picture switch is off. Read here rather than at launch: the header is laid out again on every pass, so
+    // the switch takes effect as it is flipped.
+    [info showCreatorPicture:SGEnabled(SGRKeyAlbumArtistPicture) ? SGRCreatorPicture(parent) : nil];
 
     // More, pinned over the page rather than left in the header, which is blanked and scrolls away.
     SGRPinnedMore(page, &kPinnedMoreKey, SGRFindByIdentifier(header, @"Components.UI.ContextMenuButton*", &kMoreKey));

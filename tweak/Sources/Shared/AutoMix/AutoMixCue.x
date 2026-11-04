@@ -23,6 +23,17 @@ static NSString *sg_lastLogged;
 
 - (NSDictionary *)metadata {
     NSDictionary *metadata = %orig;
+    // Diagnostics for the album page's play counts: what Spotify puts in a track's metadata, once a launch.
+    static BOOL dumped;
+    if (!dumped && metadata.count) {
+        dumped = YES;
+        SGLog(@"metadata keys: %@", [[metadata.allKeys sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "]);
+        for (NSString *key in metadata) {
+            if ([key.lowercaseString containsString:@"play"] || [key.lowercaseString containsString:@"popular"]) {
+                SGLog(@"metadata %@ = %@", key, metadata[key]);
+            }
+        }
+    }
     if (!SGEnabled(SGKeyAutoMix)) return metadata;
     NSString *uri = SGURIString(self.URI);
     if (!uri.length) return metadata;

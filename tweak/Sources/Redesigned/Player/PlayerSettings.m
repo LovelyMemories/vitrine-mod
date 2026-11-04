@@ -30,6 +30,7 @@
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
+#import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 #import "PlayerPresetStrip.h"
 
@@ -190,7 +191,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 - (void)reloadBackgroundAnimated:(BOOL)animated {
     // The card shows what the player will: Auto resolved to the track in it.
     SGRPlayerBackgroundKind kind = SGRPlayerBackground();
-    if (kind == SGRPlayerBackgroundAuto) kind = SGRPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
+    if (kind == SGRPlayerBackgroundAuto) kind = SGPlayerMenuAnimatedArtwork() ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundVisualiser;
     __weak SGRPlayerShowcase *weakSelf = self;
     void (^arrived)(void) = !self.window ? nil : ^{
         SGRPlayerShowcase *showcase = weakSelf;

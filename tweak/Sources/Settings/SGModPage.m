@@ -3,6 +3,7 @@
 #import "SGPageStyle.h"
 #import "SGPageTitle.h"
 #import "SGGlowSwitch.h"
+#import "SGRestartBanner.h"
 #import "Core/SGCore.h"
 
 NSString *const SGRestartNote = @"Changes apply after you restart Spotify.";
@@ -750,6 +751,16 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     [super viewWillLayoutSubviews];
     if (_intro) SGFitNote(self.tableView, _intro, 24, 0);
     if (_footer) SGFitNote(self.tableView, _footer, 16, 24);
+    if ([self pageWaitsForRestart]) SGRRestartBannerAttach(self.view);
+}
+
+// A page that opens with the restart note is a page of settings a launch reads once: the banner under it counts
+// what has been changed since Spotify started, and offers the restart.
+- (BOOL)pageWaitsForRestart {
+    for (UIView *view in _intro.subviews) {
+        if ([view isKindOfClass:UILabel.class] && [((UILabel *)view).text isEqualToString:SGRestartNote]) return YES;
+    }
+    return NO;
 }
 
 - (void)viewDidLayoutSubviews {
@@ -1058,6 +1069,9 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     SGModRow *row = [self rowAt:path];
     if (row.flag) SGSetFlagOverride(row.key, on ? @(!row.forceOff) : nil);
     else SGSetEnabled(row.key, on != row.inverted);
+    // A page whose intro is the restart note is a page of settings read at launch: a flip there is one of the
+    // changes the banner under the page counts.
+    if ([self pageWaitsForRestart]) SGRRestartChanged();
     if (row.changed) row.changed(on);
     // A glowing switch is let finish its slide before the reload puts a new one in its place; rows coming
     // or going are let finish first too.

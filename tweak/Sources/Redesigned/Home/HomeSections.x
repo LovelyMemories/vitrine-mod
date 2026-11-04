@@ -199,10 +199,28 @@ static SGRHomeKind stackKind(UIStackView *stack) {
 
 // A shelf stays unless its heading names one that is switched off; one with no heading to read yet stays, and
 // HomeHeadings.x asks the cell to measure again once there is one.
+// A shelf of podcasts or audiobooks, by the heading it carries: Spotify names their classes after the episode
+// cards inside, which the heading is the only honest word for. Both languages the app is used in are read.
+static BOOL podcastsShelf(UIView *shelf) {
+    NSString *title = (SGRHomeShelfTitle(shelf) ?: SGRHomeShelfIdentity(shelf)).lowercaseString;
+    if (!title.length) return NO;
+    for (NSString *word in @[@"podcast", @"подкаст", @"аудиокниг", @"audiobook", @"episode", @"эпизод"]) {
+        if ([title containsString:word]) return YES;
+    }
+    return NO;
+}
+
+// A shelf stays unless its heading names one that is switched off; one with no heading to read yet stays, and
+// HomeHeadings.x asks the cell to measure again once there is one.
 static SGRHomeKind shelfKind(UIView *shelf) {
     NSString *identity = SGRHomeShelfIdentity(shelf);
     if (!identity) return SGRHomeKindKeep;
     SGRHomeNoteShelf(identity);
+    // Podcasts and audiobooks are off Home unless asked for, as the 1.0.1 build has them; a stored switch still wins.
+    if (SGFlag(SGRKeyHomeHidePodcasts, YES) && podcastsShelf(shelf)) {
+        logOnce(@"podcasts shelf dropped");
+        return SGRHomeKindDrop;
+    }
     return SGRHomeShelfHidden(identity) ? SGRHomeKindDrop : SGRHomeKindKeep;
 }
 

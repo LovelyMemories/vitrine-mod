@@ -448,8 +448,11 @@ static NSArray<NSString *> *backgroundNotes(void) {
 // The colours the field is drawn in, from the cover playing: the palette's edge colour for the light and its field
 // colour for the shade, as the player's own background takes them.
 - (void)overlayArtworkChanged {
-    UIImage *image = SGRNowPlayingArtwork(NULL, &_overlayArtwork);
+    // The identity comes back through an autoreleasing out-parameter, which an ivar's address cannot be.
+    NSString *identity = nil;
+    UIImage *image = SGRNowPlayingArtwork(NULL, &identity);
     if (!image || !_overlay) return;
+    _overlayArtwork = identity;
     __weak SGRPlayerPage *weakSelf = self;
     [SGRPalette paletteForImage:image request:(SGRPaletteRequest){0} completion:^(SGRPalette *palette) {
         SGRPlayerPage *page = weakSelf;

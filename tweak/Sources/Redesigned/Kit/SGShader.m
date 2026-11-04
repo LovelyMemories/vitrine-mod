@@ -21,10 +21,48 @@ static NSString *const kShaderSource = @""
 "}\n"
 "\n"
 "// Dither: a stable hash of the pixel and the frame, so a flat colour on an OLED screen does not band.\n"
-"static inline float sgaHash(float2 p, uint seed) {\n"
+"static inline float sgaPixelHash(float2 p, uint seed) {\n"
 "    uint h = uint(p.x) * 1597334677u ^ uint(p.y) * 3812015801u ^ seed * 2654435761u;\n"
 "    h ^= h >> 13; h *= 0x5bd1e995u; h ^= h >> 15;\n"
 "    return float(h & 0xFFFFu) / 65535.0;\n"
+"}\n"
+"\n"
+"// The newer build of the mod's own shader library, taken as it stands (docs/chroma-ambient.metal): integer\n"
+"// hashing that stays put at large coordinates, value noise with a quintic fade, fBm over it, and the colour\n"
+"// space its ambient light is mixed in.\n"
+"inline uint sgaHashU(uint x) {\n"
+"    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x;\n"
+"}\n"
+"inline float sgaHash(int2 cell, uint seed) {\n"
+"    uint h = sgaHashU(uint(cell.x) * 0x8da6b343u ^ uint(cell.y) * 0xd8163841u ^ seed * 0xcb1ab31fu);\n"
+"    return float(h & 0xffffffu) / 16777216.0;\n"
+"}\n"
+"inline float2 sgaHash2(int2 cell, uint seed) {\n"
+"    return float2(sgaHash(cell, seed), sgaHash(cell, seed + 0x51u));\n"
+"}\n"
+"inline float sgaNoise(float2 p, uint seed) {\n"
+"    float2 i = floor(p), f = p - i;\n"
+"    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);\n"
+"    int2 c = int2(i);\n"
+"    float a = sgaHash(c, seed), b = sgaHash(c + int2(1, 0), seed);\n"
+"    float d = sgaHash(c + int2(0, 1), seed), e = sgaHash(c + int2(1, 1), seed);\n"
+"    return mix(mix(a, b, u.x), mix(d, e, u.x), u.y);\n"
+"}\n"
+"inline float sgaFbm(float2 p, uint seed, int octaves) {\n"
+"    float sum = 0.0, amp = 0.5, norm = 0.0;\n"
+"    for (int i = 0; i < octaves; i++) {\n"
+"        sum += amp * sgaNoise(p, seed + uint(i) * 17u);\n"
+"        norm += amp; amp *= 0.5; p = p * 2.03 + 11.7;\n"
+"    }\n"
+"    return sum / norm;\n"
+"}\n"
+"inline float sgaLuma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }\n"
+"inline float3 sgaToLinear(float3 c) {\n"
+"    return select(pow((c + 0.055) / 1.055, 2.4), c / 12.92, c <= 0.04045);\n"
+"}\n"
+"inline float3 sgaToSRGB(float3 c) {\n"
+"    c = max(c, 0.0);\n"
+"    return select(1.055 * pow(c, 1.0 / 2.4) - 0.055, c * 12.92, c <= 0.0031308);\n"
 "}\n"
 "\n"
 "struct SGFrame { float2 size; float time; float amount; };\n"
@@ -56,8 +94,30 @@ static NSString *const kShaderSource = @""
 "// Grain, for the Fluid field's film look: pixel noise at a share of `amount`, moving with `time`.\n"
 "fragment half4 sgaGrain(SGAVertex in [[stage_in]], constant SGFrame &f [[buffer(0)]]) {\n"
 "    float2 px = in.uv * f.size;\n"
-"    float g = sgaHash(px, uint(f.time * 12.0)) - 0.5;\n"
+"    float g = sgaPixelHash(px, uint(f.time * 12.0)) - 0.5;\n"
 "    return half4(half3(g * f.amount + 0.5), half(1.0));\n"
+"}\n"
+"\n"
+"// The ambient field: the light behind Home's cards and the player in the newer build, drawn rather than moved.\n"
+"// Two colours run into each other where the noise folds over, a soft light sits over it, and a little grain keeps\n"
+"// it from banding on an OLED screen.\n"
+"struct SGAmbientFrame { float2 size; float time; float amount; float4 top; float4 bottom; };\n"
+"\n"
+"fragment half4 sgaAmbient(SGAVertex in [[stage_in]], constant SGAmbientFrame &a [[buffer(0)]]) {\n"
+"    float aspect = a.size.x / max(a.size.y, 1.0);\n"
+"    float2 uv = in.uv;\n"
+"    float2 p = float2(uv.x * aspect, uv.y) * 1.7;\n"
+"    float t = a.time * 0.045;\n"
+"    // The domain is folded over itself first, so the noise drifts in folds instead of sliding.\n"
+"    float2 q = p + float2(sgaFbm(p + float2(t, -t), 7u, 3), sgaFbm(p + float2(-t, t), 11u, 3)) * 1.15;\n"
+"    float n = sgaFbm(q * 1.35 + float2(0.0, t * 0.5), 23u, 4);\n"
+"    float3 color = mix(a.bottom.rgb, a.top.rgb, smoothstep(0.22, 0.78, n));\n"
+"    float2 d = (uv - float2(0.5, 0.62)) * float2(aspect, 1.0);\n"
+"    float light = smoothstep(1.15, 0.05, length(d));\n"
+"    color += a.top.rgb * light * 0.32;\n"
+"    color *= 0.62 + 0.48 * light;\n"
+"    color += (sgaPixelHash(uv * a.size, uint(a.time * 24.0)) - 0.5) * 0.03 * a.amount;\n"
+"    return half4(half3(clamp(color, 0.0, 1.0)), half(1.0));\n"
 "}\n";
 
 static SGShaderLibrary *sg_shared;
@@ -326,6 +386,121 @@ typedef struct {
 
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
     // Nothing to rebuild: the shader reads the size from the uniforms each frame.
+}
+
+@end
+
+// The frame the ambient shader takes: the view's size, the seconds it has run, the grain, and the two colours.
+// Laid out to the shader's own alignment -- two floats, two floats, then the two colours on a 16-byte line.
+typedef struct {
+    float width, height;
+    float time;
+    float amount;
+    float top[4], bottom[4];
+} SGAmbientUniforms;
+
+@interface SGAmbientView () <MTKViewDelegate>
+@end
+
+@implementation SGAmbientView {
+    id<MTLRenderPipelineState> _pipeline;
+    NSTimer *_timer;
+    CFTimeInterval _started;
+}
+
++ (BOOL)metalAmbientAvailable {
+    return SGShaderLibrary.shared != nil;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    SGShaderLibrary *kit = SGShaderLibrary.shared;
+    if (!kit) return nil;
+    if (!(self = [super initWithFrame:frame device:kit.device])) return nil;
+    self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    self.framebufferOnly = YES;
+    self.opaque = YES;
+    self.userInteractionEnabled = NO;
+    self.enableSetNeedsDisplay = NO;
+    self.paused = YES;
+    self.delegate = self;
+    self.topColor = [UIColor colorWithWhite:1 alpha:1];
+    self.bottomColor = [UIColor colorWithWhite:0 alpha:1];
+    self.amount = 0.35;
+    NSError *error = nil;
+    id<MTLFunction> vertex = [kit.library newFunctionWithName:@"sgaFullscreen"];
+    id<MTLFunction> fragment = [kit.library newFunctionWithName:@"sgaAmbient"];
+    if (vertex && fragment) {
+        MTLRenderPipelineDescriptor *descriptor = [MTLRenderPipelineDescriptor new];
+        descriptor.vertexFunction = vertex;
+        descriptor.fragmentFunction = fragment;
+        descriptor.colorAttachments[0].pixelFormat = self.colorPixelFormat;
+        _pipeline = [kit.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    }
+    if (!_pipeline) {
+        SGLog(@"shaders: the ambient pipeline did not build: %@", error.localizedDescription ?: @"no reason given");
+        return nil;
+    }
+    _started = CACurrentMediaTime();
+    return self;
+}
+
+- (void)dealloc {
+    [_timer invalidate];
+}
+
+- (void)setMoving:(BOOL)moving {
+    if (moving == _moving) return;
+    _moving = moving;
+    [_timer invalidate];
+    _timer = nil;
+    if (!moving) return;
+    __weak typeof(self) weakSelf = self;
+    _timer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 30.0 repeats:YES block:^(NSTimer *timer) {
+        SGAmbientView *view = weakSelf;
+        if (!view.window || !view.moving) return;
+        [view draw];
+    }];
+}
+
+// In a window it draws once at once, then keeps drawing while it moves; out of one it stops, as the grain does.
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    BOOL moving = _moving;
+    _moving = !moving;   // forces setMoving to take effect again for the new window
+    [self setMoving:moving];
+    if (self.window) [self draw];
+}
+
+- (void)drawInMTKView:(MTKView *)view {
+    SGShaderLibrary *kit = SGShaderLibrary.shared;
+    if (!kit || !_pipeline || !self.window) return;
+    id<CAMetalDrawable> drawable = view.currentDrawable;
+    MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
+    if (!drawable || !pass) return;
+
+    SGAmbientUniforms uniforms = {0};
+    uniforms.width = (float)view.drawableSize.width;
+    uniforms.height = (float)view.drawableSize.height;
+    uniforms.time = (float)(CACurrentMediaTime() - _started);
+    uniforms.amount = (float)self.amount;
+    CGFloat r = 0, g = 0, b = 0, a = 1, br = 0, bg = 0, bb = 0, ba = 1;
+    [self.topColor getRed:&r green:&g blue:&b alpha:&a];
+    [self.bottomColor getRed:&br green:&bg blue:&bb alpha:&ba];
+    uniforms.top[0] = (float)r; uniforms.top[1] = (float)g; uniforms.top[2] = (float)b; uniforms.top[3] = 1;
+    uniforms.bottom[0] = (float)br; uniforms.bottom[1] = (float)bg; uniforms.bottom[2] = (float)bb; uniforms.bottom[3] = 1;
+
+    id<MTLCommandBuffer> buffer = [kit.queue commandBuffer];
+    id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:pass];
+    [encoder setRenderPipelineState:_pipeline];
+    [encoder setFragmentBytes:&uniforms length:sizeof uniforms atIndex:0];
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+    [encoder endEncoding];
+    [buffer presentDrawable:drawable];
+    [buffer commit];
+}
+
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+    [self draw];
 }
 
 @end

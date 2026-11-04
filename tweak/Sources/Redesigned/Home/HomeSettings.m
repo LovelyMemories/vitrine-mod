@@ -4,6 +4,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
+#import "Redesigned/Kit/SGShader.h"
 #import "Home.h"
 
 static NSString *const kFirstShelf = @"First shelf";
@@ -16,6 +17,7 @@ static NSString *const kFirstShelf = @"First shelf";
 
 @implementation SGRHomeShowcase {
     UIView *_card, *_ambient, *_play;
+    SGAmbientView *_ambientShader;
     UILabel *_title, *_ambientTitle;
     UIView *_pill, *_avatar;
     UIView *_row;
@@ -109,6 +111,18 @@ static NSString *const kFirstShelf = @"First shelf";
     scene.startPoint = CGPointMake(0, 0);
     scene.endPoint = CGPointMake(1, 1);
     [_ambient.layer addSublayer:scene];
+    // Where the device can, the scene is drawn rather than mixed: the newer build's ambient field, in this card's
+    // own two colours. The gradient stays under it, and is all that shows where Metal cannot.
+    if ([SGAmbientView metalAmbientAvailable]) {
+        _ambientShader = [[SGAmbientView alloc] initWithFrame:CGRectZero];
+        if (_ambientShader) {
+            _ambientShader.topColor = SGColorRGB(0x8E4BE0);
+            _ambientShader.bottomColor = SGColorRGB(0x1B1440);
+            _ambientShader.amount = 0.3;
+            _ambientShader.moving = YES;
+            [_ambient addSubview:_ambientShader];
+        }
+    }
     [_card addSubview:_ambient];
     _ambientTitle = [UILabel new];
     _ambientTitle.text = @"Your week";
@@ -160,6 +174,7 @@ static NSString *const kFirstShelf = @"First shelf";
     // The wide card takes what is left under the shelf.
     CGFloat ambientTop = CGRectGetMaxY(_row.frame) + 10;
     _ambient.frame = CGRectMake(side, ambientTop, inner, MAX(48, cardHeight - ambientTop - 12));
+    _ambientShader.frame = _ambient.bounds;
     _ambient.layer.sublayers.firstObject.frame = _ambient.bounds;
     _ambientTitle.frame = CGRectMake(12, CGRectGetHeight(_ambient.bounds) - 26, CGRectGetWidth(_ambient.bounds) - 60, 18);
     _play.frame = CGRectMake(CGRectGetWidth(_ambient.bounds) - 42, CGRectGetHeight(_ambient.bounds) - 38, 30, 30);

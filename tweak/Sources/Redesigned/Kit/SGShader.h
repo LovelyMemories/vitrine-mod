@@ -45,3 +45,18 @@ NSArray<NSString *> *SGShaderWhy(void);
 // Drawing at all: a paused song sets it NO and the timer stops with it.
 @property (nonatomic) BOOL moving;
 @end
+
+// The ambient field: the soft light the newer build of this mod puts behind Home's cards and the player, drawn
+// per pixel -- value noise, folded over itself and coloured by the two colours given. Core Animation can only move
+// a picture it already has; this is the picture. It answers NO from +metalAmbientAvailable where the library is
+// missing, and the caller keeps its gradient.
+@interface SGAmbientView : MTKView
++ (BOOL)metalAmbientAvailable;
+// The field's two ends: `top` is the light, `bottom` the shade it comes out of.
+@property (nonatomic, strong) UIColor *topColor;
+@property (nonatomic, strong) UIColor *bottomColor;
+// Between 0 and 1: how much film grain the field carries.
+@property (nonatomic) CGFloat amount;
+// Drawing at all: stops the timer when nothing is on screen.
+@property (nonatomic) BOOL moving;
+@end

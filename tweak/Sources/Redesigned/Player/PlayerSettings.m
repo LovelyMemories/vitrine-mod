@@ -392,6 +392,11 @@ static NSArray<NSString *> *backgroundNotes(void) {
 @implementation SGRPlayerPage {
     UIView *_header;
     UILabel *_note;
+    // The Fluid field, drawn by the shader. It sits over the table rather than inside the card: a Metal layer inside
+    // a view the page animates took the app down twice in -[CALayer superlayer], so the card keeps a plain field and
+    // this is laid over its frame as the table scrolls.
+    SGAmbientView *_overlay;
+    NSString *_overlayArtwork;
 }
 
 - (void)viewDidLoad {
@@ -407,6 +412,49 @@ static NSArray<NSString *> *backgroundNotes(void) {
     if (self.presets) [_header addSubview:self.presets];
     [self showNote];
     self.tableView.tableHeaderView = _header;
+
+    if ([SGAmbientView metalAmbientAvailable]) {
+        _overlay = [[SGAmbientView alloc] initWithFrame:CGRectZero];
+        if (_overlay) {
+            _overlay.followsFluid = YES;
+            _overlay.userInteractionEnabled = NO;
+            _overlay.layer.cornerRadius = kCardRadius;
+            _overlay.layer.cornerCurve = kCACornerCurveContinuous;
+            _overlay.clipsToBounds = YES;
+            _overlay.hidden = YES;
+            [self.view insertSubview:_overlay aboveSubview:self.tableView];
+        }
+    }
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(overlayArtworkChanged)
+                                               name:SGRNowPlayingArtworkDidChangeNotification object:nil];
+    // The field follows the card as the page scrolls, without taking the table's own delegate methods.
+    [self.tableView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:NULL];
+}
+
+// The card's frame in the page, held over it: the field is as tall as the card and is cut with it, and it goes away
+// with the card when the page scrolls it off or another background is picked.
+- (void)layoutOverlay {
+    if (!_overlay) return;
+    BOOL fluid = SGRPlayerBackground() == SGRPlayerBackgroundFluid;
+    CGRect frame = [self.showcase convertRect:self.showcase.bounds toView:self.view];
+    _overlay.frame = frame;
+    _overlay.hidden = !fluid || CGRectIsEmpty(CGRectIntersection(frame, self.view.bounds));
+    _overlay.moving = !_overlay.hidden && !SGPlayerState().isPaused;
+    if (!_overlay.hidden) [self.view bringSubviewToFront:_overlay];
+}
+
+// The colours the field is drawn in, from the cover playing: the palette's edge colour for the light and its field
+// colour for the shade, as the player's own background takes them.
+- (void)overlayArtworkChanged {
+    UIImage *image = SGRNowPlayingArtwork(NULL, &_overlayArtwork);
+    if (!image || !_overlay) return;
+    __weak SGRPlayerPage *weakSelf = self;
+    [SGRPalette paletteForImage:image request:(SGRPaletteRequest){0} completion:^(SGRPalette *palette) {
+        SGRPlayerPage *page = weakSelf;
+        if (!page || !palette.edgeColor) return;
+        page->_overlay.topColor = palette.edgeColor;
+        page->_overlay.bottomColor = palette.fieldColor ?: palette.edgeColor;
+    }];
 }
 
 - (void)showNote {
@@ -454,8 +502,23 @@ static NSArray<NSString *> *backgroundNotes(void) {
     table.tableHeaderView = _header;
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutOverlay];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ([keyPath isEqualToString:@"contentOffset"]) { [self layoutOverlay]; return; }
+    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+}
+
+- (void)dealloc {
+    [self.tableView removeObserver:self forKeyPath:@"contentOffset"];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self overlayArtworkChanged];
     // The player's ⋯ menu can switch Animated and Fluid while the page is away.
     self.backgrounds.artwork = SGRNowPlayingArtwork(NULL, NULL);
     [self.backgrounds setSelected:SGRPlayerBackground()];
@@ -466,6 +529,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 - (void)backgroundPicked:(NSInteger)index {
     SGSetInt(SGRKeyPlayerBackground, index);
+    [self layoutOverlay];
     [self.showcase reloadBackgroundAnimated:YES];
     [self showNote];
     [self refreshVisibility];

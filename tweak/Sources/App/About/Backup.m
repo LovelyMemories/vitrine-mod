@@ -70,6 +70,7 @@ void SGShareDiagnostics(void) {
     }
     // This launch's lines, from the system log: release builds keep none of their own.
     [text appendString:@"\n== log, this launch\n"];
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 150000
     NSError *error;
     OSLogStore *store = [OSLogStore storeWithScope:OSLogStoreCurrentProcessIdentifier error:&error];
     // FLEX builds dump the screen's views into the log, page after page; the report keeps the lines.
@@ -83,6 +84,11 @@ void SGShareDiagnostics(void) {
     NSUInteger keep = MIN(lines.count, 1500);
     [text appendString:[[lines subarrayWithRange:NSMakeRange(lines.count - keep, keep)] componentsJoinedByString:@"\n"]];
     if (!lines.count) [text appendFormat:@"(none: %@)", error.localizedDescription ?: @"the log is empty"];
+#else
+    // OSLogStore is iOS 15 and up: an SDK older than that has no such store, and the report says so rather than
+    // leaving the section blank.
+    [text appendString:@"(no system log: built against an SDK older than iOS 15)"];
+#endif
     NSURL *caches = [NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
     NSString *config = [NSString stringWithContentsOfURL:[caches URLByAppendingPathComponent:@"Vitrine/live-config.txt"]
                                                 encoding:NSUTF8StringEncoding error:nil];

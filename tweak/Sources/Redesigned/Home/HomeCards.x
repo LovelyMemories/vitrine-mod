@@ -61,7 +61,13 @@ static void calmDJ(UIView *card) {
 // the button's own pass otherwise; brought up to date now, the styling reads final frames.
 static void settle(UIView *button) {
     if (!SGRHomeLook()) return;
-    for (UIView *sub in button.subviews) [sub layoutIfNeeded];
+    // A preview card's element asks its data statement for values as it lays out, and Spotify's own code throws when
+    // they are not there yet (MediumDensityMusicPreviewCardElement:317). Those cards settle themselves.
+    for (UIView *sub in button.subviews) {
+        NSString *name = NSStringFromClass(sub.class);
+        if ([name containsString:@"MediumDensity"] || [name containsString:@"Preview"]) continue;
+        [sub layoutIfNeeded];
+    }
 }
 
 // A card of Spotify's that names itself an AI mix ("AI DJ", "Вечерний дрифт AI"): a small pill in its corner, so the

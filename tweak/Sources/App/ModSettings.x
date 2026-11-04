@@ -72,6 +72,7 @@ static UIViewController *modSettingsPage(void) {
 
     // The rows of one look are asked again as Redesigned UI is flipped, so the page shows what the restart brings.
     BOOL (^redesigned)(void) = ^BOOL { return SGRedesignedUIStored(); };
+    UIViewController *SGTransitionsPage(void);   // App/Pages.m
     BOOL (^native)(void) = ^BOOL { return !SGRedesignedUIStored(); };
 
     // The tile colors are the system palette's, in dark mode except where SGColorRGB gives a lighter or deeper shade.
@@ -89,12 +90,15 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *home = pageRow(@"Home & Library", @"house.fill", UIColor.systemBrownColor, ^UIViewController *{ return SGHomeSettingsPage(); });
     home.visible = native;
     SGModRow *redesignedHome = pageRow(@"Home", @"house.fill", UIColor.systemBrownColor, ^UIViewController *{ return SGRHomeSettingsPage(); });
+    // AutoMix's page, a thing of its own: it hands Spotify's engine the cue points of a crossfade (App/Pages.m).
+    SGModRow *transitions = pageRow(@"Transitions", @"arrow.triangle.merge", UIColor.systemTealColor, ^UIViewController *{ return SGTransitionsPage(); });
     redesignedHome.visible = redesigned;
     [sections addObject:SGSection(nil, @[
         redesignedHome,
         home,
         pageRow(@"Player", @"play.fill", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble.fill", UIColor.systemOrangeColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),
+        transitions,
         albums,
         artists,
     ])];

@@ -173,14 +173,7 @@ UIViewController *SGPlayerSettingsPage(void) {
         SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
     ])];
 
-    // AutoMix: the cue points of a transition, handed to Spotify's own engine (Shared/AutoMix).
-    [sections addObject:SGNotedSection(@"Transitions", @[
-        SGWithTile(SGOptionRow(@"AutoMix", @"Blend each song into the next", SGKeyAutoMix), @"arrow.triangle.merge", UIColor.systemTealColor),
-    ], @"Every song fades out over its last 12 seconds and the next one in over its first 12, and the two meet in the "
-       @"middle. Spotify's own crossfade plays the meeting; the points are placed from each track's length, so a "
-       @"transition lines up in time but not beat for beat. Applies after you restart Spotify.")];
-
-    [sections addObject:SGNotedSection(@"Lossless", @[
+[sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Your own FLACs in place of Spotify's stream", SGKeyLossless),
     ], @"Put FLAC or ALAC files in Files › Spotify › Lossless. A file plays when its title and length match the song "
        @"and its sound matches what Spotify plays, from about 4 s after the song starts or you seek. Spotify still "
@@ -191,4 +184,16 @@ UIViewController *SGPlayerSettingsPage(void) {
     // rows and the Mini player section under it.
     if (!native) return SGRPlayerSettingsPage(sections);
     return [[SGModPage alloc] initWithTitle:@"Player" intro:SGRestartNote sections:sections footer:nil];
+}
+
+// Transitions, a page of its own in Mod Settings' list (App/ModSettings.x): AutoMix hands Spotify's own engine the
+// cue points of a crossfade (Shared/AutoMix), so it reads as a thing of its own rather than a fold of Player.
+UIViewController *SGTransitionsPage(void) {
+    return [[SGModPage alloc] initWithTitle:@"Transitions" intro:nil sections:@[
+        SGNotedSection(nil, @[
+            SGWithTile(SGOptionRow(@"AutoMix", @"Blend each song into the next", SGKeyAutoMix), @"arrow.triangle.merge", UIColor.systemTealColor),
+        ], @"Every song fades out over its last 12 seconds and the next one in over its first 12, and the two meet in the "
+           @"middle. Spotify's own crossfade plays the meeting; the points are placed from each track's length, so a "
+           @"transition lines up in time but not beat for beat. Applies after you restart Spotify."),
+    ] footer:nil];
 }

@@ -3,12 +3,13 @@
 #import "Redesigned/Kit/SGRFluid.h"
 #import "Settings/SGPageStyle.h"
 
-static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 16;
+static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 12;
 
 @implementation SGRFluidPresetStrip {
     NSArray<NSString *> *_names;
     void (^_picked)(NSInteger index);
     NSMutableArray<UIView *> *_cards;
+    UIScrollView *_run;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame names:(NSArray<NSString *> *)names picked:(void (^)(NSInteger))picked {
@@ -19,13 +20,20 @@ static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 16;
     self.backgroundColor = SGCardBackground();
     self.layer.cornerRadius = 16;
     self.layer.cornerCurve = kCACornerCurveContinuous;
-    self.clipsToBounds = NO;
+    // Six cards do not fit a phone's width: the run scrolls inside the card rather than running over the page.
+    self.clipsToBounds = YES;
+
+    _run = [UIScrollView new];
+    _run.showsHorizontalScrollIndicator = NO;
+    _run.alwaysBounceHorizontal = YES;
+    _run.clipsToBounds = NO;
+    [self addSubview:_run];
 
     for (NSUInteger i = 0; i < names.count; i++) {
         UIControl *card = [UIControl new];
         card.tag = (NSInteger)i;
         [card addTarget:self action:@selector(tapped:) forControlEvents:UIControlEventTouchUpInside];
-        card.accessibilityLabel = names[i];
+        card.accessibilityLabel = SGLocalized(names[i]);
         card.layer.cornerRadius = 16;
         card.layer.cornerCurve = kCACornerCurveContinuous;
 
@@ -45,14 +53,21 @@ static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 16;
         title.textAlignment = NSTextAlignmentCenter;
         [card addSubview:title];
 
-        [self addSubview:card];
+        [_run addSubview:card];
         [_cards addObject:card];
     }
+    // Painted here, not only when colours arrive: the cards are the presets, and a strip nobody coloured still has
+    // to show what Soft and Fast look like.
+    [self paintAll];
     return self;
 }
 
 - (void)setColors:(NSArray<UIColor *> *)colors {
     _colors = [colors copy];
+    [self paintAll];
+}
+
+- (void)paintAll {
     for (NSUInteger i = 0; i < _cards.count; i++) [self paint:_cards[i] index:i];
 }
 
@@ -86,29 +101,32 @@ static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 16;
         smear.endPoint = CGPointMake(1, 1);
         [art.layer addSublayer:smear];
     }
-    [art setNeedsLayout];
+    [self setNeedsLayout];
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGFloat inset = kSide, x = inset;
-    for (UIView *card in _cards) {
-        card.frame = CGRectMake(x, 14, kCardWidth, kCardHeight);
-        UIView *art = [card viewWithTag:1];
-        art.frame = CGRectMake(0, 0, kCardWidth, kCardHeight - 20);
-        for (CALayer *layer in art.layer.sublayers) layer.frame = art.bounds;
-        UILabel *title = [card viewWithTag:2];
-        title.frame = CGRectMake(-4, CGRectGetMaxY(art.frame) + 3, kCardWidth + 8, 16);
-        x += kCardWidth + kGap;
-    }
+    CGFloat width = CGRectGetWidth(self.bounds), height = CGRectGetHeight(self.bounds);
+    _run.frame = self.bounds;
     NSInteger current = SGRFluidCurrentPreset();
+    CGFloat x = kSide;
     for (UIView *card in _cards) {
-        BOOL on = card.tag == current;
+        card.frame = CGRectMake(x, 12, kCardWidth, kCardHeight);
+        BOOL on = (NSInteger)card.tag == current;
         card.layer.borderWidth = on ? 2 : 0;
         card.layer.borderColor = SGGreen().CGColor;
+        // From the card's own size every pass: insetting the frame it already has would shrink it a little more
+        // on every layout.
         UIView *art = [card viewWithTag:1];
-        art.frame = CGRectInset(art.frame, on ? 2 : 0, on ? 2 : 0);
+        CGRect artFrame = CGRectMake(0, 0, kCardWidth, kCardHeight - 22);
+        art.frame = on ? CGRectInset(artFrame, 3, 3) : artFrame;
+        for (CALayer *layer in art.layer.sublayers) layer.frame = art.bounds;
+        UILabel *title = [card viewWithTag:2];
+        title.frame = CGRectMake(-4, CGRectGetMaxY(artFrame) + 3, kCardWidth + 8, 16);
+        x += kCardWidth + kGap;
     }
+    _run.contentSize = CGSizeMake(MAX(width, x - kGap + kSide), height);
+    _run.contentInset = UIEdgeInsetsMake(0, 0, 0, kSide);
 }
 
 - (void)tapped:(UIControl *)card {
@@ -117,7 +135,7 @@ static const CGFloat kCardWidth = 74, kCardHeight = 122, kGap = 10, kSide = 16;
 }
 
 - (CGSize)intrinsicContentSize {
-    return CGSizeMake(kSide * 2 + _cards.count * (kCardWidth + kGap), kCardHeight + 30);
+    return CGSizeMake(kSide * 2 + _cards.count * (kCardWidth + kGap), kCardHeight + 26);
 }
 
 @end

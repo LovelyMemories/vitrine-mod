@@ -1,6 +1,7 @@
 #import "SGShader.h"
 #import <string.h>
 #import "Core/SGCore.h"
+#import "SGRFluid.h"
 
 // The shaders, as Metal source. They are compiled at runtime so that a tree without a .metal target still builds
 // (see SGShader.h). The fragment shaders are kept plain: a fullscreen triangle, the frame's time and size, and a
@@ -101,21 +102,23 @@ static NSString *const kShaderSource = @""
 "// The ambient field: the light behind Home's cards and the player in the newer build, drawn rather than moved.\n"
 "// Two colours run into each other where the noise folds over, a soft light sits over it, and a little grain keeps\n"
 "// it from banding on an OLED screen.\n"
-"struct SGAmbientFrame { float2 size; float time; float amount; float4 top; float4 bottom; };\n"
+"struct SGAmbientFrame { float2 size; float time; float amount; float speed; float warp; float gain; float pad;\n"
+"                        float4 top; float4 bottom; };\n"
 "\n"
 "fragment half4 sgaAmbient(SGAVertex in [[stage_in]], constant SGAmbientFrame &a [[buffer(0)]]) {\n"
 "    float aspect = a.size.x / max(a.size.y, 1.0);\n"
 "    float2 uv = in.uv;\n"
 "    float2 p = float2(uv.x * aspect, uv.y) * 1.7;\n"
-"    float t = a.time * 0.045;\n"
+"    float t = a.time * 0.045 * max(a.speed, 0.15);\n"
 "    // The domain is folded over itself first, so the noise drifts in folds instead of sliding.\n"
-"    float2 q = p + float2(sgaFbm(p + float2(t, -t), 7u, 3), sgaFbm(p + float2(-t, t), 11u, 3)) * 1.15;\n"
+"    float fold = 0.45 + a.warp;\n"
+"    float2 q = p + float2(sgaFbm(p + float2(t, -t), 7u, 3), sgaFbm(p + float2(-t, t), 11u, 3)) * fold;\n"
 "    float n = sgaFbm(q * 1.35 + float2(0.0, t * 0.5), 23u, 4);\n"
 "    float3 color = mix(a.bottom.rgb, a.top.rgb, smoothstep(0.22, 0.78, n));\n"
 "    float2 d = (uv - float2(0.5, 0.62)) * float2(aspect, 1.0);\n"
 "    float light = smoothstep(1.15, 0.05, length(d));\n"
 "    color += a.top.rgb * light * 0.32;\n"
-"    color *= 0.62 + 0.48 * light;\n"
+"    color *= (0.62 + 0.48 * light) * a.gain;\n"
 "    color += (sgaPixelHash(uv * a.size, uint(a.time * 24.0)) - 0.5) * 0.03 * a.amount;\n"
 "    return half4(half3(clamp(color, 0.0, 1.0)), half(1.0));\n"
 "}\n";
@@ -390,12 +393,17 @@ typedef struct {
 
 @end
 
-// The frame the ambient shader takes: the view's size, the seconds it has run, the grain, and the two colours.
-// Laid out to the shader's own alignment -- two floats, two floats, then the two colours on a 16-byte line.
+// The frame the ambient shader takes: the view's size, the seconds it has run, the grain, the rate and width it
+// folds at, its gain, then the two colours. Laid out to the shader's own alignment -- a float2, five floats, a
+// pad, then the colours on a 16-byte line.
 typedef struct {
     float width, height;
     float time;
     float amount;
+    float speed;
+    float warp;
+    float gain;
+    float pad;
     float top[4], bottom[4];
 } SGAmbientUniforms;
 
@@ -483,6 +491,17 @@ typedef struct {
     uniforms.height = (float)view.drawableSize.height;
     uniforms.time = (float)(CACurrentMediaTime() - _started);
     uniforms.amount = (float)self.amount;
+    uniforms.speed = 1;
+    uniforms.warp = 0.7;
+    uniforms.gain = 1;
+    // Fluid's own six numbers, read as it draws: the sliders on Adjust then move the field they name.
+    if (self.followsFluid) {
+        uniforms.speed = (float)(SGRFluidValue(SGRFluidSpeed) / 100.0);
+        uniforms.warp = (float)(SGRFluidValue(SGRFluidWarp) / 100.0);
+        CGFloat brightness = SGRFluidValue(SGRFluidBrightness) / 100.0, saturation = SGRFluidValue(SGRFluidSaturation) / 150.0;
+        uniforms.gain = (float)(brightness * (0.85 + 0.15 * saturation));
+        uniforms.amount = (float)(SGRFluidValue(SGRFluidGrain) / 100.0);
+    }
     CGFloat r = 0, g = 0, b = 0, a = 1, br = 0, bg = 0, bb = 0, ba = 1;
     [self.topColor getRed:&r green:&g blue:&b alpha:&a];
     [self.bottomColor getRed:&br green:&bg blue:&bb alpha:&ba];

@@ -57,6 +57,9 @@ NSArray<NSString *> *SGShaderWhy(void);
 @property (nonatomic, strong) UIColor *bottomColor;
 // Between 0 and 1: how much film grain the field carries.
 @property (nonatomic) CGFloat amount;
+// Follow Fluid's own settings (SGRFluid.h) while it draws: speed is the rate the field folds at, warp how far it
+// folds, brightness and saturation its gain, grain its grain. Off, the field keeps the numbers above.
+@property (nonatomic) BOOL followsFluid;
 // Drawing at all: stops the timer when nothing is on screen.
 @property (nonatomic) BOOL moving;
 @end

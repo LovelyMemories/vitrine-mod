@@ -105,6 +105,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
     if ([SGAmbientView metalAmbientAvailable]) {
         _ambient = [[SGAmbientView alloc] initWithFrame:frame];
         _ambient.amount = 0.25;
+        // Its five numbers are Fluid's, read as it draws: the Adjust page's sliders move this field too.
+        _ambient.followsFluid = YES;
         _ambient.hidden = YES;
         if (_ambient) [self addSubview:_ambient];
     }

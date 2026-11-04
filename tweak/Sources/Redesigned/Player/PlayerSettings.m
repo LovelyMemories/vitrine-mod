@@ -102,7 +102,11 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
     // The Fluid background on the card: the newer build's ambient field, drawn by the shader in the cover's own
     // two colours, over the field. Where Metal cannot, the field's own Core Animation Fluid is what shows.
-    if ([SGAmbientView metalAmbientAvailable]) {
+    // The card's Fluid is the field's own: a Metal view inside a card the page animates and re-lays out took the
+    // app down in -[CALayer superlayer] under UIKit's animation machinery twice, so no Metal in a settings card
+    // until that path is safe. The shader still draws the player itself (grain, hills), where nothing animates the
+    // view it sits in.
+    if (NO && [SGAmbientView metalAmbientAvailable]) {
         _ambient = [[SGAmbientView alloc] initWithFrame:frame];
         _ambient.amount = 0.25;
         // Its five numbers are Fluid's, read as it draws: the Adjust page's sliders move this field too.

@@ -132,7 +132,9 @@ static NSString *const kFirstShelf = @"First shelf";
     [_ambient.layer addSublayer:scene];
     // Where the device can, the scene is drawn rather than mixed: the newer build's ambient field, in this card's
     // own two colours. The gradient stays under it, and is all that shows where Metal cannot.
-    if ([SGAmbientView metalAmbientAvailable]) {
+    // No Metal in a settings card: see PlayerSettings.m -- a Metal view inside a card the page animates crashed
+    // the app in UIKit's animation machinery. The gradient under it is what shows.
+    if (NO && [SGAmbientView metalAmbientAvailable]) {
         _ambientShader = [[SGAmbientView alloc] initWithFrame:CGRectZero];
         if (_ambientShader) {
             _ambientShader.topColor = SGColorRGB(0x8E4BE0);

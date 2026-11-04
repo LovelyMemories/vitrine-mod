@@ -183,6 +183,9 @@ void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind);
 // shares (App/Pages.m).
 UIViewController *SGRPlayerSettingsPage(NSArray *more);
 
+// Fluid's own page, opened by the Adjust row of the Player page: the field's six numbers and their reset.
+UIViewController *SGRPlayerAdjustPage(void);
+
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).
 void SGRPlayerVanish(UIView *view);

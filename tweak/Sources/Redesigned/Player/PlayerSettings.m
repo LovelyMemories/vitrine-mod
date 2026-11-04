@@ -469,6 +469,29 @@ static SGModRow *fluidSlider(NSString *title, SGRFluidSetting setting, NSString 
                        ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%@", value, unit]; });
 }
 
+// Fluid's own page, the way the newer build gives it one (SGRPlayerAdjustPage): the six numbers the field is made
+// of, and their reset. The Player page keeps the card, the backgrounds and the looks; these live where they are
+// read out at length rather than in a fold of the page.
+UIViewController *SGRPlayerAdjustPage(void) {
+    __block __weak UITableViewController *weakPage;
+    SGModRow *reset = SGActionRow(@"Reset", nil, ^{
+        SGRResetFluidSettings();
+        [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
+    });
+    reset.color = SGRed();
+    NSArray<SGModRow *> *fluid = @[
+        fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
+        fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"),
+        fluidSlider(@"Grain", SGRFluidGrain, @"%"), reset,
+    ];
+    SGModPage *page = [[SGModPage alloc] initWithTitle:@"Adjust" intro:nil sections:@[
+        SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
+                                   @"background still. Animated and Visualizer use these where they show Fluid."),
+    ] footer:nil];
+    weakPage = page;
+    return page;
+}
+
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
@@ -485,30 +508,21 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     sources.visible = lowData.visible;
 
     __block __weak UITableViewController *weakPage;
-    SGModRow *reset = SGActionRow(@"Reset", nil, ^{
-        SGRResetFluidSettings();
-        [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
-    });
-    reset.color = SGRed();
-    // The looks as cards, above the sliders: picking one lays its six settings over everything at once, and the
-    // sliders below then show what it set, so a look can be nudged from there.
+    // The looks as cards, above the rows: picking one lays its six settings over everything at once, and the
+    // sliders on Adjust then show what it set.
     __block SGRFluidPresetStrip *strip = nil;
     strip = [[SGRFluidPresetStrip alloc] initWithFrame:CGRectMake(0, 0, 320, 152) names:SGRFluidPresetNames()
                                                picked:^(NSInteger index) {
         SGRApplyingFluidPreset((SGRFluidPreset)index);
         [weakPage.tableView reloadData];
     }];
-    NSArray<SGModRow *> *fluid = @[
-        fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
-        fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"),
-        fluidSlider(@"Grain", SGRFluidGrain, @"%"), reset,
-    ];
-    for (SGModRow *row in fluid) row.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFluid; };
+    // The six numbers are a page of their own (SGRPlayerAdjustPage), one row from here.
+    SGModRow *adjust = SGPageRow(@"Adjust", ^{ return SGRPlayerAdjustPage(); });
+    adjust.subtitle = @"Fluid's speed, warp, blur, saturation, brightness and grain";
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
-        SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
-                                   @"background still. Animated and Visualizer use these where they show Fluid."),
+        SGSection(nil, @[SGWithSymbol(adjust, @"slider.horizontal.3")]),
         SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume),
                                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover),
                                       SGSwitchRow(@"Only the music", nil, SGRKeyPlayerZen)],

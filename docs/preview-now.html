@@ -171,8 +171,8 @@ const pages = {
         .map(([n, cls]) => `<div class="bg ${cls === 'on' ? 'on' : ''}"><div class="pic">${cls === 'wave' ? '<div class="wave"></div>' : ''}</div><div class="n">${n}</div></div>`).join("")}
     </div>
     <div class="printed-demo">
-      <div class="half"><div class="cov"></div><div class="cap">Animated, у трека есть клип</div></div>
-      <div class="half"><div class="cov printed"></div><div class="cap">Animated, клипа нет — обложка «напечатана»</div></div>
+      <div class="half"><div class="cov printed"></div>
+        <div class="cap">Animated: есть клип — играет клип; клипа нет — эта печать</div></div>
     </div>
     <div class="card">
       <div class="row"><div class="grow">Sources</div><div class="value">Spotify Canvas, Apple Music</div><div class="chev">›</div></div>

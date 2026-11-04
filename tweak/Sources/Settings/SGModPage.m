@@ -561,6 +561,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
 #pragma mark - the page
 
 @implementation SGModPage {
+    BOOL _restartPage;   // the page's intro is the restart note: what is changed here waits for a launch
     NSArray<SGModSection *> *_sections;
     NSArray<NSArray<SGModRow *> *> *_shown;   // each section's rows that show now (SGModRow.visible)
     UIView *_intro;

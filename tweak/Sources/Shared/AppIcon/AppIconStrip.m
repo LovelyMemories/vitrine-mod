@@ -19,12 +19,20 @@ static NSArray<NSString *> *iconNames(void) {
     return names;
 }
 
+// The list holds NSNull where the app's own icon goes, since an array cannot hold nil. Everything that reads a
+// name takes it through here first: NSNull is not a string, and asking it for one throws.
+static NSString *nameOf(id name) {
+    return [name isKindOfClass:NSString.class] ? name : nil;
+}
+
 static NSString *label(NSString *name) {
+    name = nameOf(name);
     return name ? [name stringByReplacingOccurrencesOfString:@"_" withString:@" "] : @"Default";
 }
 
 // The icon's own picture, from the PNG the bundle carries: the 120pt one, or the 60pt one blown up.
 static UIImage *preview(NSString *name) {
+    name = nameOf(name);
     if (!name) {
         // The app's primary icon, which iOS keeps as its own key.
         NSDictionary *icons = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleIcons"];
@@ -103,7 +111,7 @@ static void setIcon(NSString *icon) {
     UIControl *cell = [UIControl new];
     cell.tag = [_names indexOfObject:name];
     [cell addTarget:self action:@selector(tapped:) forControlEvents:UIControlEventTouchUpInside];
-
+    // NSNull stands for the app's own icon here; `label` and `preview` read it as nil.
     UIImageView *picture = [UIImageView new];
     picture.image = preview(name);
     picture.contentMode = UIViewContentModeScaleAspectFit;
@@ -153,8 +161,8 @@ static void setIcon(NSString *icon) {
     // ring, so the ring is not cut by the picture's own clipping.
     NSString *current = UIApplication.sharedApplication.alternateIconName;
     for (UIView *cell in _cells) {
-        id name = _names[(NSUInteger)cell.tag];
-        BOOL on = [name isKindOfClass:NSNull.class] ? current == nil : [name isEqualToString:current];
+        NSString *name = nameOf(_names[(NSUInteger)cell.tag]);
+        BOOL on = current ? [name isEqualToString:current] : name == nil;
         cell.layer.cornerRadius = 18;
         cell.layer.borderWidth = on ? 2 : 0;
         cell.layer.borderColor = SGGreen().CGColor;

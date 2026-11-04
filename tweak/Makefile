@@ -25,6 +25,10 @@ spotifyglass_CFLAGS := -fobjc-arc -ISources -DSG_VERSION=\"$(SG_VERSION)\"
 SG_DRIVER ?= 0
 spotifyglass_CFLAGS += -DSG_DRIVER=$(SG_DRIVER)
 spotifyglass_FRAMEWORKS := UIKit QuartzCore UniformTypeIdentifiers MediaPlayer CoreImage ImageIO AudioToolbox AVFoundation CoreHaptics Accelerate CoreMotion CoreML CoreText OSLog Metal MetalKit
+# The newer build of the mod links these as well, and the features that need them come with it: AVKit and
+# CoreMedia/CoreVideo for the clips and the player's own taps, PhotosUI for the player's picture, Vision for
+# reading a cover's colours. They are on every iOS this build runs on.
+spotifyglass_FRAMEWORKS += AVKit CoreMedia CoreVideo PhotosUI Vision
 # zlib unpacks KuGou's KRC lyrics (Shared/LyricsSources/KuGou.m).
 spotifyglass_LIBRARIES := z
 # Runtime swizzling instead of Substrate so the dylib has no extra dependency inside the IPA.

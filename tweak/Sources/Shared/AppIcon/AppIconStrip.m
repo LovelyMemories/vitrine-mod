@@ -27,7 +27,24 @@ static NSString *nameOf(id name) {
 
 static NSString *label(NSString *name) {
     name = nameOf(name);
-    return name ? [name stringByReplacingOccurrencesOfString:@"_" withString:@" "] : @"Default";
+    if (!name) return @"Default";
+    // The icons are named SGAppIconArcsLight and the like: the prefix says nothing to a person, and a capital
+    // inside the name starts a word of its own.
+    if ([name hasPrefix:@"SGAppIcon"]) name = [name substringFromIndex:9];
+    name = [name stringByReplacingOccurrencesOfString:@"_" withString:@" "];
+    NSMutableString *spaced = [NSMutableString string];
+    for (NSUInteger i = 0; i < name.length; i++) {
+        unichar c = [name characterAtIndex:i];
+        if (i) {
+            unichar previous = [name characterAtIndex:i - 1];
+            BOOL upperAfterLower = c >= 'A' && c <= 'Z' && previous >= 'a' && previous <= 'z';
+            BOOL digitAfterWord = c >= '0' && c <= '9' && ((previous >= 'A' && previous <= 'Z') || (previous >= 'a' && previous <= 'z'));
+            BOOL wordAfterDigit = ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) && previous >= '0' && previous <= '9';
+            if (upperAfterLower || digitAfterWord || wordAfterDigit) [spaced appendString:@" "];
+        }
+        [spaced appendFormat:@"%C", c];
+    }
+    return spaced;
 }
 
 // The icon's own picture, from the PNG the bundle carries: the 120pt one, or the 60pt one blown up.
@@ -186,13 +203,18 @@ SGModRow *SGAppIconCountRow(void) {
     NSArray<NSString *> *names = iconNames();
     if (!names.count || !UIApplication.sharedApplication.supportsAlternateIcons) return nil;
     SGModRow *row = SGActionRow(@"All icons", nil, ^{
-        NSMutableArray<NSString *> *choices = [NSMutableArray arrayWithObject:label(nil)];
-        for (NSString *name in names) [choices addObject:label(name)];
+        // The icon in effect is ticked, so the sheet can be read without switching to see what is on. No
+        // pictures here: a UIAlertAction takes one only through a key UIKit does not publish, and a throw there
+        // would take the page down. The strip above is the one with the pictures.
         UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"App icon" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-        [sheet addAction:[UIAlertAction actionWithTitle:label(nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { setIcon(nil); }]];
-        for (NSString *name in names) {
-            [sheet addAction:[UIAlertAction actionWithTitle:label(name) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { setIcon(name); }]];
-        }
+        void (^add)(NSString *) = ^(NSString *name) {
+            NSString *current = UIApplication.sharedApplication.alternateIconName;
+            BOOL on = current ? [name isEqualToString:current] : name == nil;
+            NSString *title = on ? [@"✓ " stringByAppendingString:label(name)] : label(name);
+            [sheet addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *chosen) { setIcon(name); }]];
+        };
+        add(nil);
+        for (NSString *name in names) add(name);
         [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
         [SGTopController() presentViewController:sheet animated:YES completion:nil];
     });

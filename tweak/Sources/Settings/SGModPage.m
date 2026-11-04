@@ -784,9 +784,14 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         UIView *header = [UIView new];
         CGFloat top = 12;
         if (self.iconStrip) {
+            // Laid out first, at the width it will have, so the height read here is the one it settled on: it sizes
+            // itself to its pictures and their names in -layoutSubviews, and the page would otherwise take the height
+            // it had at 320 points wide.
             self.iconStrip.frame = CGRectMake(inset, top, width - 2 * inset, self.iconStrip.frame.size.height);
+            [self.iconStrip setNeedsLayout];
+            [self.iconStrip layoutIfNeeded];
             [header addSubview:self.iconStrip];
-            top = CGRectGetMaxY(self.iconStrip.frame) + 10;
+            top = CGRectGetMaxY(self.iconStrip.frame) + 14;
         }
         if (self.accentStrip) {
             self.accentStrip.frame = CGRectMake(inset, top, width - 2 * inset, self.accentStrip.frame.size.height);

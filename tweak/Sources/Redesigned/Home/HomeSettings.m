@@ -6,6 +6,7 @@
 #import "Settings/SGPageStyle.h"
 #import "Redesigned/Kit/SGShader.h"
 #import "Home.h"
+#import "HomePreviewFeed.h"
 
 static NSString *const kFirstShelf = @"First shelf";
 
@@ -23,6 +24,22 @@ static NSString *const kFirstShelf = @"First shelf";
     UIView *_row;
     NSArray<UIView *> *_tiles;
     NSArray<UILabel *> *_names, *_lines;
+    CFTimeInterval _pulled;   // when the card last asked Home what it is showing
+}
+
+// The card is Home itself: the pictures and the words it shows now, in its own order (HomePreviewFeed.h). Read
+// again as the page lays out, no more than twice a second; where Home is not on screen the drawn stand-ins stay.
+- (void)refreshFeed {
+    CFTimeInterval now = CACurrentMediaTime();
+    if (now - _pulled < 0.5) return;
+    _pulled = now;
+    NSArray<SGRHomeFeedItem *> *items = SGRHomeFeedItems((NSInteger)_tiles.count);
+    for (NSUInteger i = 0; i < items.count && i < _tiles.count; i++) {
+        SGRHomeFeedItem *item = items[i];
+        ((UIImageView *)[_tiles[i] viewWithTag:1]).image = item.image;
+        if (item.title.length) _names[i].text = item.title;
+        _lines[i].text = item.subtitle ?: @"";
+    }
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -73,8 +90,10 @@ static NSString *const kFirstShelf = @"First shelf";
     NSArray<NSString *> *subtitles = @[@"Made for you", @"Your mix", @"Played a lot", @"New"];
     for (NSInteger i = 0; i < 4; i++) {
         UIView *cell = [UIView new];
-        UIView *cover = [UIView new];
+        UIImageView *cover = [UIImageView new];
         cover.backgroundColor = i == 0 ? SGColorRGB(0x3B5BD8) : [UIColor colorWithWhite:1 alpha:0.55];
+        cover.contentMode = UIViewContentModeScaleAspectFill;
+        cover.clipsToBounds = YES;
         cover.layer.cornerRadius = 8;
         cover.layer.cornerCurve = kCACornerCurveContinuous;
         cover.tag = 1;
@@ -179,6 +198,7 @@ static NSString *const kFirstShelf = @"First shelf";
     _ambientTitle.frame = CGRectMake(12, CGRectGetHeight(_ambient.bounds) - 26, CGRectGetWidth(_ambient.bounds) - 60, 18);
     _play.frame = CGRectMake(CGRectGetWidth(_ambient.bounds) - 42, CGRectGetHeight(_ambient.bounds) - 38, 30, 30);
     [_play viewWithTag:9].frame = _play.bounds;
+    [self refreshFeed];
 }
 
 @end

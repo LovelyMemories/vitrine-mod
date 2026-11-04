@@ -15,6 +15,7 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
+#import "HomePreviewFeed.h"
 
 // How far the cover sits in from the tile's top, bottom and leading edges, and its corners there (the reference's
 // 37pt covers at 5pt in, with corners of about 6; 3pt in for the denser Home, so a tile is mostly its cover).
@@ -263,6 +264,7 @@ void SGRHomeTintForCover(UIImage *image, void (^completion)(UIColor *color)) {
 }
 
 void SGRHomeStyleTile(UIView *tile) {
+    SGRHomeFeedRemember(tile);   // the card on the Home page reads the feed these tiles sit in
     CFTimeInterval began = SGRHomeProbeBegin();
     UIImageView *cover = partsOf(tile).cover;
     if (!cover) return;

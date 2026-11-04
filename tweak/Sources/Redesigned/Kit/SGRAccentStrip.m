@@ -3,10 +3,27 @@
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
 
-// -1 keeps Spotify's own green; the rest are the colors the redesign offers, Apple Music's red among them.
+// -1 keeps Spotify's own green; the rest are the colors the redesign offers, Apple Music's red among them, then the
+// colours picked lately, which is what the newer build's swatches keep.
+static NSString *const kRecentKey = @"spotifyglass.redesign.accent.recent";
+
+void SGRAccentRemember(NSInteger rgb) {
+    if (rgb < 0 || rgb > 0xFFFFFF) return;
+    NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    NSMutableArray<NSNumber *> *list = [[store arrayForKey:kRecentKey] mutableCopy] ?: [NSMutableArray array];
+    [list removeObject:@(rgb)];
+    [list insertObject:@(rgb) atIndex:0];
+    while (list.count > 4) [list removeLastObject];
+    [store setObject:list forKey:kRecentKey];
+}
+
 static NSArray<NSNumber *> *accentValues(void) {
-    return @[@(-1), @(SGAppleMusicRed), @(SGRDefaultAccent), @(0x0A84FF), @(0xBF5AF2),
-             @(0xFF375F), @(0xFF9F0A), @(0x64D2FF)];
+    NSMutableArray<NSNumber *> *values = [@[@(-1), @(SGAppleMusicRed), @(SGRDefaultAccent), @(0x0A84FF), @(0xBF5AF2),
+                                           @(0xFF375F), @(0xFF9F0A), @(0x64D2FF)] mutableCopy];
+    for (NSNumber *recent in [NSUserDefaults.standardUserDefaults arrayForKey:kRecentKey] ?: @[]) {
+        if (![values containsObject:recent]) [values addObject:recent];
+    }
+    return values;
 }
 
 @interface SGRAccentStripView : UIView
@@ -48,6 +65,7 @@ static NSArray<NSNumber *> *accentValues(void) {
     SGSetInt(SGRKeyAccent, rgb);
     // A pick is what the picker row comes back to: Spotify's own green is not one of them.
     if (rgb >= 0) SGSetInt(SGRKeyAccentCustom, rgb);
+    SGRAccentRemember((NSInteger)rgb);
     [self paint];
     UISelectionFeedbackGenerator *feedback = [UISelectionFeedbackGenerator new];
     [feedback selectionChanged];

@@ -2,6 +2,7 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
+#import "SGRAccentStrip.h"
 
 // The redesign's rows of the Appearance page (App/Pages.m): the color in effect, which opens the picker, and the
 // plain checkmark. The presets are the strip above the rows (SGRAccentStrip.m); a color stored from the picker is
@@ -12,6 +13,7 @@ NSArray<SGModRow *> *SGRAppearanceRows(void) {
         SGPickColor(@"Accent color", SGRAccentRGB(), ^(NSInteger rgb) {
             SGSetInt(SGRKeyAccent, rgb);
             SGSetInt(SGRKeyAccentCustom, rgb);
+            SGRAccentRemember(rgb);   // the strip keeps what has been picked lately, as the newer build's swatches do
         });
     });
     colour.swatch = ^UIColor *{ return SGColorRGB(SGRAccentRGB()); };

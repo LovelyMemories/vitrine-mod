@@ -787,7 +787,11 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
             // Laid out first, at the width it will have, so the height read here is the one it settled on: it sizes
             // itself to its pictures and their names in -layoutSubviews, and the page would otherwise take the height
             // it had at 320 points wide.
-            self.iconStrip.frame = CGRectMake(inset, top, width - 2 * inset, self.iconStrip.frame.size.height);
+            // Its own height is the one it asks for: the strip lays its cells out inside whatever frame it is given,
+            // so a frame made before it knew its pictures left the names outside it and the card below on top of them.
+            CGSize wanted = self.iconStrip.intrinsicContentSize;
+            CGFloat stripHeight = MAX(CGRectGetHeight(self.iconStrip.frame), wanted.height);
+            self.iconStrip.frame = CGRectMake(inset, top, width - 2 * inset, stripHeight);
             [self.iconStrip setNeedsLayout];
             [self.iconStrip layoutIfNeeded];
             [header addSubview:self.iconStrip];

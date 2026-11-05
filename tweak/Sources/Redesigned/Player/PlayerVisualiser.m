@@ -504,8 +504,11 @@ void SGRPlayerVisualiserUpdate(void) {
     if (!wanted) {
         SGRVisualiserView *old = sg_view;
         sg_view = nil;
-        if (old.window) [old disappear:^{ [old removeFromSuperview]; }];
-        else [old removeFromSuperview];
+        // The view stops being seen instead of being taken out: a completion block that removes its own view
+        // leaves UIKit's renderer reading a layer whose superlayer is gone, which is the SIGSEGV in
+        // CALayerGetSuperlayer under _UIToValueForAnimation that came from this page.
+        [old disappear:^{}];
+        old.alpha = 0;
         return;
     }
     BOOL made = !sg_view;

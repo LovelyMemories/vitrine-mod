@@ -564,8 +564,10 @@ static void clear(BOOL animated) {
     holdField();
     animated = animated && seen(old);
     setCoverShown(YES, animated);
-    if (animated) [old disappear:^{ [old removeFromSuperview]; }];
-    else [old removeFromSuperview];
+    // The view stops being seen instead of being taken out: a completion block that removes its own view leaves
+    // UIKit's renderer reading a layer whose superlayer is gone (SIGSEGV in CALayerGetSuperlayer, from this page).
+    [old disappear:^{}];
+    old.alpha = 0;
 }
 
 static void show(NSString *track, NSURL *file) {

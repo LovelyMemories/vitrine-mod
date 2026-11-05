@@ -29,17 +29,21 @@ static void roundCover(UIView *card) {
     // An artist's picture comes round: Spotify rounds the holder, or the picture in it, to half its side. The mod's
     // cards are squares, so anything that round is squared to the cover radius -- the art stays, only the mask
     // changes, and a square cover keeps the radius it already had.
-    CGFloat side = CGRectGetWidth(holder.bounds);
-    if (holder.layer.cornerRadius >= side / 2 - 1) {
-        holder.layer.cornerRadius = SGRRadiusCover;
-        holder.layer.cornerCurve = kCACornerCurveContinuous;
-        holder.layer.masksToBounds = YES;
-    }
+    // A mask layer of Spotify's own keeps its circle whatever the corner radius says, so it goes as well: the picture
+    // is cut by the holder's corners and nothing else. The radius is set unconditionally -- a square cover that had
+    // none came out with Spotify's own again on the next pass.
+    holder.layer.mask = nil;
+    holder.layer.cornerRadius = SGRRadiusCover;
+    holder.layer.cornerCurve = kCACornerCurveContinuous;
+    holder.layer.masksToBounds = YES;
+    holder.clipsToBounds = YES;
     for (UIView *sub in holder.subviews) {
         if (![sub isKindOfClass:UIImageView.class]) continue;
-        if (sub.layer.cornerRadius >= CGRectGetWidth(sub.bounds) / 2 - 1) sub.layer.cornerRadius = SGRRadiusCover;
+        sub.layer.mask = nil;
         roundCorners(sub, SGRRadiusCover);
-        if (!sub.layer.masksToBounds) sub.layer.masksToBounds = YES;
+        sub.layer.masksToBounds = YES;
+        sub.clipsToBounds = YES;
+        ((UIImageView *)sub).contentMode = UIViewContentModeScaleAspectFill;
     }
 }
 

@@ -89,12 +89,9 @@ static UIViewController *modSettingsPage(void) {
     artists.visible = redesigned;
     SGModRow *home = pageRow(@"Home & Library", @"house.fill", UIColor.systemBrownColor, ^UIViewController *{ return SGHomeSettingsPage(); });
     home.visible = native;
-    SGModRow *redesignedHome = pageRow(@"Home", @"house.fill", UIColor.systemBrownColor, ^UIViewController *{ return SGRHomeSettingsPage(); });
     // AutoMix's page, a thing of its own: it hands Spotify's engine the cue points of a crossfade (App/Pages.m).
     SGModRow *transitions = pageRow(@"Transitions", @"arrow.triangle.merge", UIColor.systemTealColor, ^UIViewController *{ return SGTransitionsPage(); });
-    redesignedHome.visible = redesigned;
     [sections addObject:SGSection(nil, @[
-        redesignedHome,
         home,
         pageRow(@"Player", @"play.fill", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble.fill", UIColor.systemOrangeColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),

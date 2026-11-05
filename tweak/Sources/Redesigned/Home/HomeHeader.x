@@ -1,12 +1,12 @@
 // Home redesign: the header the way the Music app has it. The filter pills (All, Music, Podcasts) go and
 // a large title takes their place at the leading edge; the avatar that opens the side drawer moves to the
 // trailing edge; the scrim Spotify lays behind the header goes too, the soft scroll edge (Kit/SGREdgeEffect.x)
-// being what keeps the page scrolling under it soft; the title itself scrolls away (followScroll).
+// being what keeps the title clear of the page scrolling under it, as on every other redesigned page.
 //
 // Tree (trees/clean/home/10.txt:3018-3051): FunkisViewController's view holds a 402x112 UIView around
 // Reprise_LiquidGlassKit LiquidGlass.GradientView (the scrim) and, at {0, 62}, an
 // ElementView<HomeHeaderElement> 402x50 holding HomeHeaderView > UIStackView {0, 8} 402x34 of two arranged
-// views: ListeningActivity_ElementsKit.AdaptiveFaceContainer {16, 0} 32x34 (the avatar, an EncoreButton in 9.1.90,
+// views: ListeningActivity_ElementsKit.AdaptiveFaceContainer {16, 0} 32x34 (the avatar,
 // id=Components.UI.SideDrawerButton) and LiquidGlass.LeadingFadeMaskView {48, 1} 354x32 around
 // Home_PillUIKit.PillScrollView.
 //
@@ -17,37 +17,15 @@
 // the way the redesign takes any view out of a stack Spotify arranges (Kit/SGRRestyle.h).
 //
 // The title is Spotify's own name for the tab, read off its tab bar item (id=TabBar.Item.Home, 10.txt:3100),
-// so it follows the app's language. The filter pill wears the same turning rainbow rim as the Mod Settings
-// switches (Settings/SGGlowSwitch.m), drawn inside the glass so it scrolls and fades with it.
-#import <math.h>
+// so it follows the app's language.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Redesigned/Kit/SGRRing.h"
 #import "Home.h"
 
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
 static const NSUInteger kTitleTries = 8;
 
-static char kTitleKey, kDateKey, kTabKey, kPillGlassKey, kGlassKey, kButtonsKey, kConnectKey, kWatchKey, kRimKey, kPinKey;
-// The title row's pill: a glass capsule around the filter button and the avatar, 44pt tall, as the reference has
-// it; the menu drives Spotify's own filter chips, hidden in the stack, and offers the device picker when Spotify
-// has one (a now playing bar) and the large shelf's Show all, its heading being gone (HomeTopPicks.x).
-static const CGFloat kPillHeight = 44, kPillButton = 44, kPillPad = 6;
-// The page's violet wash behind the title, fading to black over this height: it reaches through the header and the
-// first shelf, and is gone by the middle of the screen.
-
-// The pill's buttons sit above Spotify's stack, which would take every touch in the header otherwise; a touch
-// outside a button goes through to the avatar under them.
-@interface SGRHomePillButtons : UIView
-@property (nonatomic, strong) UIButton *filter;
-@end
-@implementation SGRHomePillButtons
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hit = [super hitTest:point withEvent:event];
-    return hit == self ? nil : hit;
-}
-@end
-
+static char kTitleKey, kTabKey;
 static NSString *sg_tabName;
 
 static void vanish(UIView *view) {
@@ -65,9 +43,9 @@ static UIView *childNamed(UIView *host, NSString *marker) {
 }
 
 static NSString *tabName(UIWindow *window) {
-    if (sg_tabName || !window) return sg_tabName ?: SGLocalized(@"Home");
+    if (sg_tabName || !window) return sg_tabName ?: @"Home";
     static NSUInteger tries;
-    if (tries >= kTitleTries) return SGLocalized(@"Home");
+    if (tries >= kTitleTries) return @"Home";
     tries++;
     UIView *item = SGRFindByIdentifier(window, @"TabBar.Item.Home", &kTabKey);
     __block NSString *name = nil;
@@ -75,10 +53,8 @@ static NSString *tabName(UIWindow *window) {
         if (!name && [v isKindOfClass:UILabel.class] && ((UILabel *)v).text.length) name = ((UILabel *)v).text;
     });
     if (!name) {
-        // The bar's labels are off by default (Tab bar > Hide labels), so there is no name to read: the title is the
-        // mod's own, in the chosen language, rather than "Home" in English.
-        if (tries == kTitleTries) SGLog(@"redesign home: the tab bar has no labels to read, the title is the mod's own");
-        return SGLocalized(@"Home");
+        if (tries == kTitleTries) SGLog(@"redesign home: the Home tab's name not found, the title stays English");
+        return @"Home";
     }
     sg_tabName = [name copy];
     SGLog(@"redesign home: title \"%@\" from the tab bar", sg_tabName);
@@ -100,215 +76,10 @@ static UILabel *titleIn(UIView *header) {
     return title;
 }
 
-// The date over the title, in capitals and the app's language, as the reference's Home has it
-// ("ПЯТНИЦА • 30 ОКТЯБРЯ"): made once a day and kept.
-static NSString *dateText(void) {
-    static NSString *kept;
-    static NSDate *keptFor;
-    NSDate *now = NSDate.date;
-    if (kept && keptFor && [NSCalendar.currentCalendar isDate:now inSameDayAsDate:keptFor]) return kept;
-    BOOL russian = SGLanguage() == 1;
-    NSDateFormatter *formatter = [NSDateFormatter new];
-    formatter.locale = [NSLocale localeWithLocaleIdentifier:russian ? @"ru_RU" : @"en_US"];
-    formatter.dateFormat = russian ? @"EEEE • d MMMM" : @"EEEE • MMMM d";
-    kept = [formatter stringFromDate:now].uppercaseString;
-    keptFor = now;
-    return kept;
-}
-
-static UILabel *dateIn(UIView *header) {
-    UILabel *label = objc_getAssociatedObject(header, &kDateKey);
-    if (!label) {
-        label = [UILabel new];
-        label.textColor = [SGRPrimary() colorWithAlphaComponent:0.62];
-        label.userInteractionEnabled = NO;
-        label.accessibilityElementsHidden = YES;   // the date is decoration; the title already reads the page out
-        objc_setAssociatedObject(header, &kDateKey, label, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (label.superview != header) [header addSubview:label];
-    return label;
-}
-
 // The header's views, found once: the page lays out again as it appears, and the walk names classes.
 static __weak UIView *sg_header;
 static __weak UIStackView *sg_stack;
 static __weak UIView *sg_scrim;
-static UIControl *connectButton(UIView *window);
-
-#pragma mark - the pill
-
-// Spotify's filter chips (All, Music, Podcasts, Audiobooks), controls in the stack's hidden pill scroller, in
-// their order there.
-static NSArray<UIControl *> *chips(UIStackView *stack) {
-    NSMutableArray<UIControl *> *found = [NSMutableArray array];
-    SGForEachView(stack, ^(UIView *v) {
-        if ([v.accessibilityIdentifier hasPrefix:@"home-feed-"] && [v isKindOfClass:UIControl.class]) [found addObject:(UIControl *)v];
-    });
-    return [found sortedArrayUsingComparator:^NSComparisonResult(UIView *a, UIView *b) {
-        CGFloat xa = [a convertRect:a.bounds toView:stack].origin.x, xb = [b convertRect:b.bounds toView:stack].origin.x;
-        return xa < xb ? NSOrderedAscending : xa > xb ? NSOrderedDescending : NSOrderedSame;
-    }];
-}
-
-// The chip in effect: selected, or drawn solid with its glass hidden (home-feed-default, trees 2026-10-11).
-static BOOL chosen(UIControl *chip) {
-    if (chip.selected) return YES;
-    __block BOOL solid = NO;
-    SGForEachView(chip, ^(UIView *v) {
-        if ([NSStringFromClass(v.class) containsString:@"ChipGlassView"] && v.hidden) solid = YES;
-    });
-    return solid;
-}
-
-static NSArray<UIMenuElement *> *menuElements(void) {
-    NSMutableArray<UIMenuElement *> *elements = [NSMutableArray array];
-    NSMutableArray<UIMenuElement *> *filters = [NSMutableArray array];
-    for (UIControl *chip in chips(sg_stack)) {
-        __weak UIControl *weakChip = chip;
-        UIAction *action = [UIAction actionWithTitle:chip.accessibilityLabel ?: @"" image:nil identifier:nil handler:^(UIAction *a) {
-            if (weakChip) SGRActivate(weakChip);
-        }];
-        action.state = chosen(chip) ? UIMenuElementStateOn : UIMenuElementStateOff;
-        [filters addObject:action];
-    }
-    if (filters.count) [elements addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:filters]];
-    NSMutableArray<UIMenuElement *> *more = [NSMutableArray array];
-    UIControl *connect = connectButton(sg_header.window);
-    if (connect) {
-        __weak UIControl *weakConnect = connect;
-        [more addObject:[UIAction actionWithTitle:@"Devices" image:[UIImage systemImageNamed:@"hifispeaker"] identifier:nil handler:^(UIAction *a) {
-            if (weakConnect) SGRActivate(weakConnect);
-        }]];
-    }
-    NSString *title = nil;
-    UIControl *showAll = SGRHomeTopPicksShowAll(&title);
-    if (showAll) {
-        __weak UIControl *weakShowAll = showAll;
-        [more addObject:[UIAction actionWithTitle:title.length ? [NSString stringWithFormat:@"Show all · %@", title] : @"Show all"
-                                            image:[UIImage systemImageNamed:@"rectangle.stack"] identifier:nil handler:^(UIAction *a) {
-            if (weakShowAll) SGRActivate(weakShowAll);
-        }]];
-    }
-    if (more.count) [elements addObject:[UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:more]];
-    return elements;
-}
-
-// Spotify's device picker button, in the now playing bar (Components.ConnectButtonOutputSwitcher > UIButton,
-// trees 2026-10-11); nil without a bar.
-static UIControl *connectButton(UIView *window) {
-    UIView *holder = window ? SGRFindByIdentifier(window, @"Components.ConnectButtonOutputSwitcher", &kConnectKey) : nil;
-    __block UIControl *button = [holder isKindOfClass:UIControl.class] ? (UIControl *)holder : nil;
-    if (!button) SGForEachView(holder, ^(UIView *v) {
-        if (!button && [v isKindOfClass:UIControl.class]) button = (UIControl *)v;
-    });
-    return button;
-}
-
-static UIButton *pillButton(NSString *symbol, NSString *label) {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightMedium];
-    [button setImage:[UIImage systemImageNamed:symbol withConfiguration:config] forState:UIControlStateNormal];
-    button.tintColor = SGRPrimary();
-    button.accessibilityLabel = label;
-    // The menu takes the appearance of its button; outside Spotify's navigation stacks that is the system's.
-    button.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    return button;
-}
-
-static SGRHomePillButtons *buttonsIn(UIView *header) {
-    SGRHomePillButtons *buttons = objc_getAssociatedObject(header, &kButtonsKey);
-    if (!buttons) {
-        buttons = [SGRHomePillButtons new];
-        buttons.filter = pillButton(@"line.3.horizontal.decrease", @"Filter Home");
-        buttons.filter.menu = [UIMenu menuWithChildren:@[[UIDeferredMenuElement elementWithUncachedProvider:^(void (^completion)(NSArray<UIMenuElement *> *)) {
-            completion(menuElements());
-        }]]];
-        buttons.filter.showsMenuAsPrimaryAction = YES;
-        [buttons addSubview:buttons.filter];
-        objc_setAssociatedObject(header, &kButtonsKey, buttons, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (buttons.superview != header) [header addSubview:buttons];
-    else if (header.subviews.lastObject != buttons) [header bringSubviewToFront:buttons];
-    return buttons;
-}
-
-static UIView *glassIn(UIView *header) {
-    UIView *glass = objc_getAssociatedObject(header, &kGlassKey);
-    if (!glass) {
-        glass = [UIView new];
-        glass.userInteractionEnabled = NO;
-        objc_setAssociatedObject(header, &kGlassKey, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (glass.superview != header) [header insertSubview:glass atIndex:0];
-    else if (header.subviews.firstObject != glass) [header sendSubviewToBack:glass];
-    return glass;
-}
-
-// Lays the pill out around the avatar, which stays Spotify's in its stack; the pill's leading edge.
-// The stack's place in the header with no transform on it (its center and bounds, which a transform leaves
-// alone): Spotify animates the stack in with a transform, and the one pass this ran in on a 440pt phone saw the
-// stack's frame half a width to the left, with no pass after to put the pill right.
-static CGRect untransformed(UIView *view) {
-    CGSize size = view.bounds.size;
-    return CGRectMake(view.center.x - size.width / 2, view.center.y - size.height / 2, size.width, size.height);
-}
-
-// The avatar's place, by its center and bounds too: it carries the scroll's transform (followScroll).
-static CGRect facePlace(UIStackView *stack, UIView *face) {
-    CGRect place = untransformed(stack);
-    return CGRectOffset(untransformed(face), place.origin.x - stack.bounds.origin.x, place.origin.y - stack.bounds.origin.y);
-}
-
-// A view placed by bounds and center, which the scroll's transform leaves alone.
-static void place(UIView *view, CGRect frame) {
-    CGRect bounds = (CGRect){CGPointZero, frame.size};
-    CGPoint center = CGPointMake(CGRectGetMidX(frame), CGRectGetMidY(frame));
-    if (!CGRectEqualToRect(view.bounds, bounds)) view.bounds = bounds;
-    if (!CGPointEqualToPoint(view.center, center)) view.center = center;
-}
-
-
-#pragma mark - the pill
-
-// The ring's place: read once from the row while it still stands where Spotify put it, and then kept in the
-// header's own coordinates. The header does not move with a scroll or a pull, so the ring stays where it was put,
-// the way the Search header's ring does (Redesigned/Search/SearchPage.x).
-static CGRect ringPlace(UIView *header, UIStackView *stack, UIView *face) {
-    NSValue *known = objc_getAssociatedObject(header, &kPinKey);
-    if (known) return known.CGRectValue;
-    if (header.bounds.size.width < 200 || header.bounds.size.height < 20) return CGRectZero;
-    if (!CGAffineTransformIsIdentity(header.transform)) return CGRectZero;
-    if (!face || face.superview != stack) return CGRectZero;
-    CGRect faceFrame = facePlace(stack, face);
-    CGFloat faceWidth = faceFrame.size.width, midY = CGRectGetMidY(faceFrame);
-    if (faceWidth < 16 || faceWidth > 90 || midY < 6 || midY > header.bounds.size.height - 6) return CGRectZero;
-    CGFloat width = kPillPad + kPillButton + faceWidth + kPillPad * 2;
-    CGRect ring = CGRectMake(round(CGRectGetMaxX(faceFrame) + kPillPad - width),
-                             round(midY - kPillHeight / 2), width, kPillHeight);
-    objc_setAssociatedObject(header, &kPinKey, [NSValue valueWithCGRect:ring], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    SGLog(@"redesign home: the ring stays at %@", NSStringFromCGRect(ring));
-    return ring;
-}
-
-// Lays the pill out around the avatar, in the header's own coordinates: the pill and the avatar are part of the
-// row, and it is the row that a scroll and a pull carry.
-static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
-    SGRHomePillButtons *buttons = buttonsIn(header);
-    UIView *glass = glassIn(header);
-    CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
-    CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
-    CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
-    CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
-    CGRect pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
-    place(glass, pill);
-    place(buttons, pill);
-    CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
-    if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
-    SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
-    CGRect ring = ringPlace(header, stack, face);
-    SGRRingApply(header, &kRimKey, CGRectIsEmpty(ring) ? pill : ring, pill.size.height / 2);
-    return CGRectGetMinX(pill);
-}
 
 static BOOL findHeader(UIView *view) {
     if (sg_stack && [sg_stack isDescendantOfView:view]) return YES;
@@ -327,150 +98,25 @@ static BOOL findHeader(UIView *view) {
     return NO;
 }
 
-// The title row scrolls away with the page, as the Music app's large title and avatar do: the title, the glass pill
-// and Spotify's avatar rise with what is under them and fade over the title's height, so the page never passes
-// under them.
-static __weak UIView *sg_face;
-static void rise(UIView *part, CGAffineTransform transform, CGFloat alpha) {
-    if (!CGAffineTransformEqualToTransform(part.transform, transform)) part.transform = transform;
-    if (part.alpha != alpha) part.alpha = alpha;
-}
-
-// The pill's glass takes no alpha (SGRGlass.h): it rises with the row, and its material goes off once the row is
-// half faded and comes back with it.
-static const NSTimeInterval kGlassFade = 0.15;
-static BOOL sg_glassShown = YES;
-// When the material's last change ends: until then the glass keeps rising after the row has faded.
-static CFTimeInterval sg_glassFadeEnds;
-static void riseGlass(UIView *glass, CGAffineTransform transform, CGFloat alpha) {
-    if (!glass) return;
-    if (!CGAffineTransformEqualToTransform(glass.transform, transform)) glass.transform = transform;
-    BOOL shown = alpha > 0.5;
-    UIView *shape = objc_getAssociatedObject(glass, &kPillGlassKey);
-    if (!shape || shown == sg_glassShown) return;
-    sg_glassShown = shown;
-    sg_glassFadeEnds = CACurrentMediaTime() + kGlassFade;
-    [UIView animateWithDuration:kGlassFade animations:^{ SGRShowGlass(shape, shown); }];
-}
-
-static void followScroll(UIScrollView *scroll) {
-    UILabel *title = sg_header ? objc_getAssociatedObject(sg_header, &kTitleKey) : nil;
-    if (!title || !scroll) return;
-    CGFloat scrolled = MAX(0, scroll.contentOffset.y + scroll.adjustedContentInset.top), faded = MAX(1, title.bounds.size.height);
-    CGFloat alpha = 1 - MIN(1, scrolled / faded);
-    // The title stops rising at its own height: past that it has faded out, and nothing is written again until
-    // the page comes back.
-    CGAffineTransform up = CGAffineTransformMakeTranslation(0, -MIN(scrolled, faded));
-    // The title, the pill and Spotify's avatar rise and fade with the row; the ring, which hangs on the header,
-    // does not move at all.
-    BOOL glassFading = CACurrentMediaTime() < sg_glassFadeEnds || (alpha > 0.5) != sg_glassShown;
-    UIView *glass = objc_getAssociatedObject(sg_header, &kGlassKey);
-    // The date above the title goes with it: same rise, same fade, so the block leaves the header as one.
-    rise(objc_getAssociatedObject(sg_header, &kDateKey), up, alpha);
-    rise(title, up, alpha);
-    riseGlass(glass, glassFading ? CGAffineTransformMakeTranslation(0, -scrolled) : up, alpha);
-    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);
-    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, up, alpha);
-    // The ring stays where it was put but goes with the row's fade, so it is gone by the time the page scrolls
-    // under it: no transform, only the alpha the title and the pill share.
-    rise(objc_getAssociatedObject(sg_header, &kRimKey), CGAffineTransformIdentity, alpha);
-}
-
-@interface SGRHomeTitleFollower : NSObject
-@property (nonatomic, weak) UIScrollView *scroll;
-@end
-
-@implementation SGRHomeTitleFollower
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    followScroll(self.scroll);
-}
-@end
-
-// The feed: the page's outermost scroll view taller than the pills, found once. Not the tallest: a shelf can grow taller
-// than the page, and a shelf's offset never moves the title. Followed by an observer that lives as long as it does.
-static char kFollowerKey;
-static __weak UIScrollView *sg_feed;
-static __weak UIView *sg_pageView;
-static void followFeed(UIScrollView *feed) {
-    sg_feed = feed;
-    if (!objc_getAssociatedObject(feed, &kFollowerKey)) {
-        SGRHomeTitleFollower *follower = [SGRHomeTitleFollower new];
-        follower.scroll = feed;
-        [feed addObserver:follower forKeyPath:@"contentOffset" options:0 context:NULL];
-        objc_setAssociatedObject(feed, &kFollowerKey, follower, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    followScroll(feed);
-}
-
-static void follow(UIView *view) {
-    __block UIScrollView *feed = sg_feed;
-    if (![feed isDescendantOfView:view]) feed = nil;
-    if (!feed) SGForEachView(view, ^(UIView *v) {
-        if (!feed && [v isKindOfClass:UIScrollView.class] && v.bounds.size.height > 300) feed = (UIScrollView *)v;
-    });
-    if (feed) followFeed(feed);
-}
-
-static void layoutHeader(UIViewController *page);
-
-// The page's own pass can run before Spotify has sized its header at all (the header's view 0 by 0, its stack still
-// a width to the left and centered on the origin: seen on a 440pt phone, with no pass of the page after, which
-// left the pill beside the title). While the header has no size, this comes back a little later, for a few seconds
-// at most, until it has one.
-static const NSUInteger kHeaderWaits = 30;
-static const NSTimeInterval kHeaderWait = 0.1;
-static void layoutHeaderOnceSized(UIViewController *page, UIView *header) {
-    // findHeader answers YES on the stack alone, so the header can be gone while the stack is not.
-    if (!header) return;
-    if (!CGRectIsEmpty(header.bounds)) {
-        // Sized: a later spell without a size gets its waits again.
-        if (objc_getAssociatedObject(header, &kWatchKey)) objc_setAssociatedObject(header, &kWatchKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return;
-    }
-    NSUInteger waits = [objc_getAssociatedObject(header, &kWatchKey) unsignedIntegerValue];
-    if (waits >= kHeaderWaits) return;
-    objc_setAssociatedObject(header, &kWatchKey, @(waits + 1), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    __weak UIViewController *weakPage = page;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kHeaderWait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIViewController *strongPage = weakPage;
-        if (strongPage) layoutHeader(strongPage);
-    });
-}
-
 static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
-    sg_pageView = view;
     UIView *header = sg_header;
     UIStackView *stack = sg_stack;
     vanish(sg_scrim);
-    layoutHeaderOnceSized(page, header);
 
+    static Class faceClass;
+    if (!faceClass) faceClass = NSClassFromString(@"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer");
     UIView *face = nil;
     for (UIView *part in stack.arrangedSubviews) {
-        if (SGRIsAvatar(part) && !face) face = part;
+        if (faceClass && [part isKindOfClass:faceClass]) face = part;
         else vanish(part);
-    }
-    // A face that stopped being the avatar drops the scroll's transform and fade.
-    if (sg_face && sg_face != face) rise(sg_face, CGAffineTransformIdentity, 1);
-    sg_face = face;
-    // Brought back if an earlier pass took it for a pill (vanish). Its alpha is otherwise the scroll's (followScroll).
-    if (!face.userInteractionEnabled && face.accessibilityElementsHidden) {
-        face.alpha = 1;
-        face.userInteractionEnabled = YES;
-        face.accessibilityElementsHidden = NO;
     }
     if (stack.semanticContentAttribute != UISemanticContentAttributeForceRightToLeft) {
         stack.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
         [stack setNeedsLayout];
     }
     [stack layoutIfNeeded];
-    // With the Home look off, the avatar stands alone in the stack and the title ends before it; it rises and fades
-    // with the title either way.
-    CGFloat pillLeading = face ? CGRectGetMinX(facePlace(stack, face)) : header.bounds.size.width - SGRSideMargin + SGRGrid;
-    if (SGRHomeLook()) {
-        pillLeading = layoutPill(header, stack, face);
-    }
 
     UILabel *title = titleIn(header);
     NSString *text = tabName(header.window);
@@ -481,23 +127,10 @@ static void layoutHeader(UIViewController *page) {
     UIFont *font = SGRFont(UIFontTextStyleLargeTitle, UIFontWeightBold, UIContentSizeCategoryLarge);
     if (![title.font isEqual:font]) title.font = font;
 
-    CGFloat trailing = pillLeading - SGRGrid;
+    CGFloat trailing = face ? CGRectGetMinX([stack convertRect:face.frame toView:header]) - SGRGrid : header.bounds.size.width - SGRSideMargin;
     CGFloat height = ceil(font.lineHeight);
-    // The date and the title as one block, centered where the title was: the date above, the way the reference has
-    // it, and both still clear of the status bar since the block only grows upward by the date's own line.
-    UILabel *date = dateIn(header);
-    NSString *day = dateText();
-    if (![date.text isEqualToString:day]) date.text = day;
-    UIFont *dateFont = SGRFont(UIFontTextStyleCaption2, UIFontWeightSemibold, UIContentSizeCategoryLarge);
-    if (![date.font isEqual:dateFont]) date.font = dateFont;
-    CGFloat dateHeight = ceil(dateFont.lineHeight), gap = 2;
-    CGFloat block = dateHeight + gap + height;
-    CGFloat top = round(CGRectGetMidY(untransformed(stack)) - block / 2);
-    CGRect dateFrame = CGRectMake(SGRSideMargin, top, MAX(0, trailing - SGRSideMargin), dateHeight);
-    CGRect frame = CGRectMake(SGRSideMargin, top + dateHeight + gap, MAX(0, trailing - SGRSideMargin), height);
-    place(date, dateFrame);
-    place(title, frame);
-    follow(view);
+    CGRect frame = CGRectMake(SGRSideMargin, round(CGRectGetMidY(stack.frame) - height / 2), MAX(0, trailing - SGRSideMargin), height);
+    if (!CGRectEqualToRect(title.frame, frame)) title.frame = frame;
 
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -506,23 +139,6 @@ static void layoutHeader(UIViewController *page) {
               sg_scrim ? @"found" : @"not found");
     });
 }
-
-// The feed can come after the header's last pass (its page loads while the header is laid out, a few seconds on
-// a slow account), and the page's view has no pass of its own after; a feed that replaces another (a filter) comes
-// while the old one is still in the window. The feed's own controller hands it the follower on each of its passes.
-%hook _TtC16Home_EvoPageImpl33EvoLoadableResourceViewController
-- (void)viewDidLayoutSubviews {
-    %orig;
-    UIView *view = ((UIViewController *)self).viewIfLoaded;
-    if (!sg_pageView || !view.window || ![view isDescendantOfView:sg_pageView]) return;
-    for (UIView *sub in view.subviews) {
-        if ([sub isKindOfClass:UICollectionView.class]) {
-            if (sub != sg_feed) followFeed((UIScrollView *)sub);
-            break;
-        }
-    }
-}
-%end
 
 %hook _TtC19Home_FunkisPageImpl20FunkisViewController
 - (void)viewDidLayoutSubviews {
@@ -543,7 +159,6 @@ static void layoutHeader(UIViewController *page) {
     %init;
     SGRequireClasses(@[
         @"_TtC19Home_FunkisPageImpl20FunkisViewController",
-        @"_TtC16Home_EvoPageImpl33EvoLoadableResourceViewController",
         @"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer",
     ]);
 }

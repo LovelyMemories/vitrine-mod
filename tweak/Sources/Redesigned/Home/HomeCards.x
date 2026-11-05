@@ -26,18 +26,8 @@ static void roundCorners(UIView *view, CGFloat radius) {
 static void roundCover(UIView *card) {
     UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kImageKey);
     if (holder.bounds.size.width < kCoverMinWidth) return;
-    // An artist's picture comes round: Spotify rounds the holder, or the picture in it, to half its side. The mod's
-    // cards are squares, so anything that round is squared to the cover radius -- the art stays, only the mask
-    // changes, and a square cover keeps the radius it already had.
-    CGFloat side = CGRectGetWidth(holder.bounds);
-    if (holder.layer.cornerRadius >= side / 2 - 1) {
-        holder.layer.cornerRadius = SGRRadiusCover;
-        holder.layer.cornerCurve = kCACornerCurveContinuous;
-        holder.layer.masksToBounds = YES;
-    }
     for (UIView *sub in holder.subviews) {
         if (![sub isKindOfClass:UIImageView.class]) continue;
-        if (sub.layer.cornerRadius >= CGRectGetWidth(sub.bounds) / 2 - 1) sub.layer.cornerRadius = SGRRadiusCover;
         roundCorners(sub, SGRRadiusCover);
         if (!sub.layer.masksToBounds) sub.layer.masksToBounds = YES;
     }
@@ -57,61 +47,16 @@ static void calmDJ(UIView *card) {
     }
 }
 
-// The button's content (Encore's card, the cover's holder, a tile's row with its playing indicator) is laid out after
-// the button's own pass otherwise; brought up to date now, the styling reads final frames.
-static void settle(UIView *button) {
-    if (!SGRHomeLook()) return;
-    for (UIView *sub in button.subviews) [sub layoutIfNeeded];
-}
-
-// A card of Spotify's that names itself an AI mix ("AI DJ", "Вечерний дрифт AI"): a small pill in its corner, so the
-// card reads as one at a glance. Spotify keeps the card, its button and its text; only the badge is the mod's.
-static char kMixBadgeKey;
-static void styleMix(UIView *button) {
-    NSString *name = button.accessibilityLabel ?: @"";
-    BOOL ai = [name hasSuffix:@"AI"] || [name containsString:@" AI "] || [name hasPrefix:@"AI "];
-    if (!ai) return;
-    UILabel *badge = objc_getAssociatedObject(button, &kMixBadgeKey);
-    if (!badge) {
-        badge = [UILabel new];
-        badge.text = @"AI";
-        badge.textAlignment = NSTextAlignmentCenter;
-        badge.font = SGRFont(UIFontTextStyleCaption2, UIFontWeightBold, UIContentSizeCategoryLarge);
-        badge.textColor = SGRPrimary();
-        badge.backgroundColor = [SGRAccent() colorWithAlphaComponent:0.92];
-        badge.layer.cornerCurve = kCACornerCurveContinuous;
-        badge.layer.cornerRadius = 8;
-        badge.layer.masksToBounds = YES;
-        badge.userInteractionEnabled = NO;
-        badge.accessibilityElementsHidden = YES;   // the card already reads its own name out
-        objc_setAssociatedObject(button, &kMixBadgeKey, badge, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        static dispatch_once_t once;
-        dispatch_once(&once, ^{ SGLog(@"redesign home: an AI mix card wears its badge"); });
-    }
-    if (badge.superview != button) [button addSubview:badge];
-    CGFloat width = 26, height = 16, inset = 10;
-    CGRect frame = CGRectMake(round(button.bounds.size.width - width - inset), inset, width, height);
-    if (!CGRectEqualToRect(badge.frame, frame)) badge.frame = frame;
-}
-
 static void style(UIView *button) {
     NSString *identifier = button.accessibilityIdentifier;
-    // Spotify reuses a button across kinds (a tile's became a shelf card on the phone, 2026-10-11): what the other
-    // kind put on it comes off first.
     if ([identifier isEqualToString:@"Shortcut.Card.Home"]) {
-        settle(button);
-        SGRHomeStyleLargeCard(button);
-        CGFloat radius = SGRHomeLook() ? SGRHomeTileRadius : SGRRadiusCover;
-        roundCorners(button, radius);
-        if (button.superview.layer.cornerRadius > 0) roundCorners(button.superview, radius);
+        roundCorners(button, SGRRadiusCover);
+        if (button.superview.layer.cornerRadius > 0) roundCorners(button.superview, SGRRadiusCover);
         SGRHomeStyleTile(button);
         return;
     }
     if ([identifier isEqualToString:@"Components.UI.HomeCard"]) {
-        settle(button);
-        SGRHomeUnstyleTile(button);
-        if (!SGRHomeStyleLargeCard(button)) roundCover(button);
-        styleMix(button);
+        roundCover(button);
         return;
     }
     static Class dj;
@@ -133,80 +78,6 @@ static void style(UIView *button) {
 }
 %end
 
-// Spotify gives a reused card or tile its new text, and a feed switched by the filter its new cards, without
-// laying the button out again: a label of its own (Encore.Label-internal, the tile title's -internal) given text
-// under a card or tile marks the button, so the next layout pass styles it with the text as it is then. Spotify's
-// SPTEncoreLabel is KVO-observed, so the Kit's per-instance observers cannot take it (SGRRestyle.h).
-static void relayoutButtonAround(UIView *view);
-
-static void retextedUnder(UIView *label) {
-    CFTimeInterval began = SGRHomeProbeBegin();
-    NSString *identifier = label.accessibilityIdentifier;
-    BOOL ours = [identifier hasSuffix:@"-internal"] || [identifier hasSuffix:@".playback"];
-    if (ours) relayoutButtonAround(label);
-    SGRHomeProbeEnd(SGRHomeProbeLabels, began);
-    if (ours) SGRHomeProbeEnd(SGRHomeProbeLabelsMatched, began);
-}
-
-// The walk is 20 to 30 ns a call (measured 2026-10-12 against an isDescendantOfView: check on Home's list, which is
-// no cheaper and would miss a label that joins the window before its card does), so no cheaper gate is kept.
-static void relayoutButtonAround(UIView *label) {
-    static Class backing;
-    if (!backing) backing = NSClassFromString(@"_TtC19LegacyUI_ECMCoreKit31InteractableLayoutBackingButton");
-    UIView *button = label.superview;
-    for (NSUInteger depth = 0; button && depth < 16 && ![button isKindOfClass:backing]; depth++) button = button.superview;
-    if (![button isKindOfClass:backing]) return;
-    NSString *identifier = button.accessibilityIdentifier;
-    if ([identifier isEqualToString:@"Shortcut.Card.Home"] || [identifier isEqualToString:@"Components.UI.HomeCard"]) [button setNeedsLayout];
-}
-
-// The hooks the Home look needs (SGRKeyHomeLook): none of them install while it is off.
-%group SGRHomeLook
-
-// The tile's playing indicator comes and goes with what plays, on its own, without the tile laying out: shown or
-// hidden, the tile's pass is asked for again, and HomeTiles.m moves it to the trailing edge or lets the title have
-// the room back.
-%hook _TtC11Home_ECMKit36ShortcutCardHomePlayingIndicatorView
-- (void)setHidden:(BOOL)hidden {
-    BOOL was = ((UIView *)self).hidden;
-    %orig;
-    if (was == hidden) return;
-    CFTimeInterval began = SGRHomeProbeBegin();
-    relayoutButtonAround((UIView *)self);
-    SGRHomeProbeEnd(SGRHomeProbeFrames, began);
-}
-%end
-
-// A new card's labels get their text before the card is in the window, under no button yet: once Spotify's label
-// joins the window under a card or tile, that button is marked, so the pass that styles it sees the labels.
-%hook SPTEncoreLabel
-- (void)didMoveToWindow {
-    %orig;
-    UIView *label = (UIView *)self;
-    if (!label.window) return;
-    CFTimeInterval began = SGRHomeProbeBegin();
-    // Spotify's card and tile text (id Encore.Label, Shortcut.Card.Home.Content.title); the rest of its labels pass.
-    NSString *identifier = label.accessibilityIdentifier;
-    BOOL ours = [identifier isEqualToString:@"Encore.Label"] || [identifier hasSuffix:@".Content.title"];
-    if (ours) relayoutButtonAround(label);
-    SGRHomeProbeEnd(SGRHomeProbeLabels, began);
-    if (ours) SGRHomeProbeEnd(SGRHomeProbeLabelsMatched, began);
-}
-%end
-
-%hook UILabel
-- (void)setText:(NSString *)text {
-    %orig;
-    retextedUnder((UIView *)self);
-}
-- (void)setAttributedText:(NSAttributedString *)text {
-    %orig;
-    retextedUnder((UIView *)self);
-}
-%end
-
-%end   // SGRHomeLook
-
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
@@ -214,7 +85,4 @@ static void relayoutButtonAround(UIView *label) {
         @"_TtC19LegacyUI_ECMCoreKit31InteractableLayoutBackingButton",
         @"_TtC30Discovery_MediumDensityCardKit9DJMDCView",
     ]);
-    if (!SGRHomeLook()) return;
-    %init(SGRHomeLook);
-    SGRequireClasses(@[@"_TtC11Home_ECMKit36ShortcutCardHomePlayingIndicatorView", @"SPTEncoreLabel"]);
 }

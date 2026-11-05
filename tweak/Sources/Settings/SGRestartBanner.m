@@ -86,16 +86,11 @@ void SGRRestartBannerAttach(UIView *host) {
         [sg_banner removeFromSuperview];
         [host addSubview:sg_banner];
     }
-    // Over the page's content but above the bars it floats under: the tab bar and the now playing bar stand between
-    // the banner and the screen's foot, so the pill sits on top of them rather than across the rows.
-    CGRect bounds = host.bounds;
-    CGFloat bottom = host.safeAreaInsets.bottom;
-    CGFloat bars = 49 + 56;   // the tab bar, and the now playing bar in its row
-    // Pinned by constraints rather than placed by arithmetic: the pill is where it belongs whatever the page's
-    // bounds, insets or scrolling do, and it does not shift by a point when they change.
+    // Pinned by constraints rather than placed by arithmetic: 115 points above the safe area's foot is over the tab
+    // bar and the now playing bar, so the pill sits on top of them rather than across the rows, and it stays there
+    // whatever the page's bounds, insets or scrolling do.
     sg_banner.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint deactivateConstraints:sg_banner.constraints];
-    (void)bottom; (void)bars;
     [NSLayoutConstraint activateConstraints:@[
         [sg_banner.leadingAnchor constraintEqualToAnchor:host.leadingAnchor constant:16],
         [sg_banner.trailingAnchor constraintEqualToAnchor:host.trailingAnchor constant:-16],

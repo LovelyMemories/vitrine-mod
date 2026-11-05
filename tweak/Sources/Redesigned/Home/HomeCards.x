@@ -1,4 +1,4 @@
-// Home redesign: every card Home keeps is the same Encore button, told apart where it lays out:
+﻿// Home redesign: every card Home keeps is the same Encore button, told apart where it lays out:
 //   id=Shortcut.Card.Home          a shortcut tile 181x48 r=4 that clips, in a ConfigurableUIEventObservingView
 //                                  r=4 (trees/clean/home/01.txt:36-37): the cover radius, continuous, and its
 //                                  picture run across it (HomeTiles.m)
@@ -29,21 +29,17 @@ static void roundCover(UIView *card) {
     // An artist's picture comes round: Spotify rounds the holder, or the picture in it, to half its side. The mod's
     // cards are squares, so anything that round is squared to the cover radius -- the art stays, only the mask
     // changes, and a square cover keeps the radius it already had.
-    // A mask layer of Spotify's own keeps its circle whatever the corner radius says, so it goes as well: the picture
-    // is cut by the holder's corners and nothing else. The radius is set unconditionally -- a square cover that had
-    // none came out with Spotify's own again on the next pass.
-    holder.layer.mask = nil;
-    holder.layer.cornerRadius = SGRRadiusCover;
-    holder.layer.cornerCurve = kCACornerCurveContinuous;
-    holder.layer.masksToBounds = YES;
-    holder.clipsToBounds = YES;
+    CGFloat side = CGRectGetWidth(holder.bounds);
+    if (holder.layer.cornerRadius >= side / 2 - 1) {
+        holder.layer.cornerRadius = SGRRadiusCover;
+        holder.layer.cornerCurve = kCACornerCurveContinuous;
+        holder.layer.masksToBounds = YES;
+    }
     for (UIView *sub in holder.subviews) {
         if (![sub isKindOfClass:UIImageView.class]) continue;
-        sub.layer.mask = nil;
+        if (sub.layer.cornerRadius >= CGRectGetWidth(sub.bounds) / 2 - 1) sub.layer.cornerRadius = SGRRadiusCover;
         roundCorners(sub, SGRRadiusCover);
-        sub.layer.masksToBounds = YES;
-        sub.clipsToBounds = YES;
-        ((UIImageView *)sub).contentMode = UIViewContentModeScaleAspectFill;
+        if (!sub.layer.masksToBounds) sub.layer.masksToBounds = YES;
     }
 }
 
@@ -65,13 +61,7 @@ static void calmDJ(UIView *card) {
 // the button's own pass otherwise; brought up to date now, the styling reads final frames.
 static void settle(UIView *button) {
     if (!SGRHomeLook()) return;
-    // A preview card's element asks its data statement for values as it lays out, and Spotify's own code throws when
-    // they are not there yet (MediumDensityMusicPreviewCardElement:317). Those cards settle themselves.
-    for (UIView *sub in button.subviews) {
-        NSString *name = NSStringFromClass(sub.class);
-        if ([name containsString:@"MediumDensity"] || [name containsString:@"Preview"]) continue;
-        [sub layoutIfNeeded];
-    }
+    for (UIView *sub in button.subviews) [sub layoutIfNeeded];
 }
 
 // A card of Spotify's that names itself an AI mix ("AI DJ", "Вечерний дрифт AI"): a small pill in its corner, so the
@@ -111,9 +101,7 @@ static void style(UIView *button) {
     if ([identifier isEqualToString:@"Shortcut.Card.Home"]) {
         settle(button);
         SGRHomeStyleLargeCard(button);
-        // The card's own corners, not the cover's: a radius half the card's width turned these into half circles. The
-    // picture fills the card now and is cut by its corners.
-    CGFloat radius = SGRHomeLook() ? 14 : SGRRadiusCover;
+        CGFloat radius = SGRHomeLook() ? SGRHomeTileRadius : SGRRadiusCover;
         roundCorners(button, radius);
         if (button.superview.layer.cornerRadius > 0) roundCorners(button.superview, radius);
         SGRHomeStyleTile(button);

@@ -1,4 +1,4 @@
-// Home redesign: of the sections the feed sends, only the music ones stay: the grid of shortcuts, the
+﻿// Home redesign: of the sections the feed sends, only the music ones stay: the grid of shortcuts, the
 // DJ and the shelves of cards (Recents, Jump back in, Your playlists, New releases, the mixes, For fans
 // of...). Every other section reports no height, so the list closes up around it: the medium density
 // previews (a video or an episode playing muted under Unmute and Watch full episode, or a playlist to

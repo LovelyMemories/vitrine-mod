@@ -1,4 +1,4 @@
-// Home redesign: Top picks, the first shelf of cards drawn large the way the Music app draws its top shelf:
+﻿// Home redesign: Top picks, the first shelf of cards drawn large the way the Music app draws its top shelf:
 // each card the cover edge to edge over a footer in the cover's color, 60% of the page wide so the next one
 // shows at the trailing edge.
 //
@@ -611,9 +611,7 @@ static void tintCard(UIView *card, UIImageView *cover) {
     SGRLargeCardParts *parts = objc_getAssociatedObject(card, &kPartsKey);
     UIImage *image = cover.image;
     if (!parts) return;
-    // On unless switched off: the card's colour coming from its cover is what the look is, and a key never written
-    // read as off, so the card stayed grey with the switch seemingly having no effect.
-    if (!SGFlag(SGRKeyHomeTopPicksColour, YES)) {
+    if (!SGEnabled(SGRKeyHomeTopPicksColour)) {
         objc_setAssociatedObject(card, &kShownKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         setColor(parts, nil, NO);
         return;

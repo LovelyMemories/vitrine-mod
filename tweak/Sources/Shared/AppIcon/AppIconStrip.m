@@ -281,7 +281,11 @@ UIView *SGAppIconStrip(void) {
     CGFloat cellWidth = floor((CGRectGetWidth(bounds) - 2 * inset - (columns - 1) * gap) / columns);
     CGFloat cellHeight = cellWidth + 22;
     _scroll.frame = bounds;
-    _scroll.contentInset = UIEdgeInsetsMake(16, 0, 32, 0);
+    // Below the navigation bar and clear of the home indicator: the cells were laid out under the bar, over the
+    // back button.
+    UIEdgeInsets safe = self.view.safeAreaInsets;
+    _scroll.contentInset = UIEdgeInsetsMake(16 + safe.top, 0, 32 + safe.bottom, 0);
+    _scroll.verticalScrollIndicatorInsets = _scroll.contentInset;
     CGFloat x = inset, y = 16;
     for (NSUInteger i = 0; i < _cells.count; i++) {
         UIControl *cell = _cells[i];

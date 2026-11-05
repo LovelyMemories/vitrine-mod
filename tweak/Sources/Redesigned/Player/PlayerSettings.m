@@ -455,7 +455,9 @@ static NSArray<NSString *> *backgroundNotes(void) {
     [self showNote];
     self.tableView.tableHeaderView = _header;
 
-    if ([SGAmbientView metalAmbientAvailable]) {
+    // The shader's field stays out of the page: a Metal layer in it took the app down in UIKit's own rendering
+    // (SIGSEGV under QuartzCore, from this page) three times. The card keeps its plain field.
+    if (NO && [SGAmbientView metalAmbientAvailable]) {
         _overlay = [[SGAmbientView alloc] initWithFrame:CGRectZero];
         if (_overlay) {
             _overlay.followsFluid = YES;

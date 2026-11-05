@@ -37,6 +37,9 @@ NSInteger SGRRestartChangeCount(void) {
     [self addSubview:_label];
 
     _button = [UIButton buttonWithType:UIButtonTypeSystem];
+    // A word longer than the pill in another language is shrunk rather than cut.
+    _button.titleLabel.adjustsFontSizeToFitWidth = YES;
+    _button.titleLabel.minimumScaleFactor = 0.75;
     _button.backgroundColor = SGColorRGB(0xFF375F);
     _button.layer.cornerRadius = 16;
     _button.layer.cornerCurve = kCACornerCurveContinuous;
@@ -54,7 +57,8 @@ NSInteger SGRRestartChangeCount(void) {
 
 - (void)layOut {
     CGFloat width = CGRectGetWidth(self.bounds);
-    _button.frame = CGRectMake(width - 16 - 96, 8, 96, 32);
+    CGFloat buttonWidth = MIN(128, MAX(96, CGRectGetWidth(_button.superview.bounds) * 0.34));
+    _button.frame = CGRectMake(width - 16 - buttonWidth, 8, buttonWidth, 32);
     _label.frame = CGRectMake(18, 8, CGRectGetMinX(_button.frame) - 26, 32);
 }
 
@@ -82,9 +86,12 @@ void SGRRestartBannerAttach(UIView *host) {
         [sg_banner removeFromSuperview];
         [host addSubview:sg_banner];
     }
+    // Over the page's content but above the bars it floats under: the tab bar and the now playing bar stand between
+    // the banner and the screen's foot, so the pill sits on top of them rather than across the rows.
     CGRect bounds = host.bounds;
     CGFloat bottom = host.safeAreaInsets.bottom;
-    sg_banner.frame = CGRectMake(16, CGRectGetHeight(bounds) - bottom - 24 - 48, CGRectGetWidth(bounds) - 32, 48);
+    CGFloat bars = 49 + 56;   // the tab bar, and the now playing bar in its row
+    sg_banner.frame = CGRectMake(16, CGRectGetHeight(bounds) - bottom - bars - 10 - 48, CGRectGetWidth(bounds) - 32, 48);
     sg_banner.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
     [host bringSubviewToFront:sg_banner];
     [sg_banner setChanges:sg_changes];

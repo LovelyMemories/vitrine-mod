@@ -1,4 +1,4 @@
-﻿// The redesign's Player page in Mod Settings (App/Pages.m opens it in place of the native look's).
+// The redesign's Player page in Mod Settings (App/Pages.m opens it in place of the native look's).
 //
 // It leads with a card of the player as the now playing track shows on it, drawn the way the newer build of this
 // mod draws it: the background chosen on the page edge to edge, the grabber and the two glass buttons at the top,
@@ -30,13 +30,44 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Kit/SGRFluid.h"
 #import "Redesigned/Kit/SGShader.h"
+#import <CoreImage/CoreImage.h>
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/SGLastTrack.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 #import "PlayerPresetStrip.h"
 #import "PlayerBackgroundStrip.h"
+
+// The printed cover: dithered and cut down to a few levels, the look the player gives a song with no moving
+// artwork of its own. Worked out once per picture and kept; a cover is 300 points wide, so this is one pass.
+static UIImage *printedCover(UIImage *image) {
+    if (!image.CGImage) return image;
+    static NSCache *cache;
+    static CIContext *context;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cache = [NSCache new];
+        cache.countLimit = 8;
+        context = [CIContext contextWithOptions:nil];
+    });
+    NSValue *key = [NSValue valueWithNonretainedObject:image];
+    UIImage *kept = [cache objectForKey:key];
+    if (kept) return kept;
+    CIImage *input = [CIImage imageWithCGImage:image.CGImage];
+    // Cut to a few levels and nothing else: the dither that came with it read as grain on a cover this size, which is
+    // not what the look wants.
+    CIFilter *posterise = [CIFilter filterWithName:@"CIColorPosterize"];
+    [posterise setValue:input forKey:kCIInputImageKey];
+    [posterise setValue:@6 forKey:@"inputLevels"];
+    CIImage *out = posterise.outputImage ?: input;
+    CGImageRef made = [context createCGImage:out fromRect:out.extent];
+    UIImage *printed = made ? [UIImage imageWithCGImage:made scale:image.scale orientation:image.imageOrientation] : image;
+    if (made) CGImageRelease(made);
+    [cache setObject:printed forKey:key];
+    return printed;
+}
 
 // The card is the player screen drawn small, as the newer build of this mod draws it: the grabber and the two
 // glass buttons at the top, the cover in the middle, the album, the title and the artist under it, the slider
@@ -74,6 +105,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 @implementation SGRPlayerShowcase {
     SGRArtworkField *_field;
     SGAmbientView *_ambient;
+    UIImageView *_printed;   // the cover printed, for Animated without a clip
     UIView *_motion, *_visualiser;
     UIImageView *_cover;
     SGMarqueeLabel *_title, *_artist;
@@ -115,6 +147,13 @@ static NSArray<NSString *> *backgroundNotes(void) {
         _ambient.hidden = YES;
         if (_ambient) [self addSubview:_ambient];
     }
+
+    // The printed cover, when Animated has no clip to show: it stands where the field would.
+    _printed = [UIImageView new];
+    _printed.contentMode = UIViewContentModeScaleAspectFill;
+    _printed.clipsToBounds = YES;
+    _printed.hidden = YES;
+    [self addSubview:_printed];
 
     // The player's own chrome: the grabber it is pulled down by, and the two glass buttons beside it.
     _grabber = [UIView new];
@@ -314,25 +353,31 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_field.flows = kind == SGRPlayerBackgroundColours;
         self->_field.fluid = !shaderFluid && (kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundVisualiser);
         self->_field.aurora = kind == SGRPlayerBackgroundAurora;
-        [self->_motion removeFromSuperview];
+        self->_motion.alpha = 0;
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
-        if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
-        [self->_visualiser removeFromSuperview];
+        if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_printed];
+        self->_visualiser.alpha = 0;
         self->_visualiser = kind == SGRPlayerBackgroundVisualiser ? SGRPlayerVisualiserPreview() : nil;
-        if (self->_visualiser) [self insertSubview:self->_visualiser aboveSubview:self->_field];
+        if (self->_visualiser) [self insertSubview:self->_visualiser aboveSubview:self->_printed];
+        // The printed cover is Animated's floor, not its alternative: a song with a clip draws the clip over it, and a
+        // song without one keeps it. It used to wait for the clip's absence, and the preview for Animated is made
+        // whether or not a clip exists, so it never showed and Fluid stood in its place.
+        BOOL printed = kind == SGRPlayerBackgroundAnimated;
+        self->_printed.hidden = !printed;
+        if (printed) {
+            self->_printed.image = printedCover(self->_cover.image);
+            SGLog(@"artwork: printed cover, no clip for this song");
+        }
         self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil || self->_visualiser != nil;
     };
     self.accessibilityValue = [SGRPlayerBackgroundNames()[(NSUInteger)kind] stringByAppendingString:@" background"];
     // A cross-fade of the whole card is a snapshot of its layer tree, and a Metal view's layer cannot be
     // snapshotted that way: with the ambient field in the card the change goes in plainly, and its colours and
     // rate change under the finger instead.
-    if (animated && self.window && !_ambient) {
-        // A crossfade, which Reduce Motion keeps: nothing moves.
-        [UIView transitionWithView:self duration:SGRCrossfade options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent
-                        animations:apply completion:nil];
-    } else {
-        apply();
-    }
+    // No cross-fade of the card: a transition snapshots its layer tree, and doing that while the field, the clip or
+    // the printed cover changes underneath took the app down in UIKit's rendering three times. The change goes in
+    // plainly, in one frame.
+    apply();
     [self setNeedsLayout];
 }
 
@@ -344,6 +389,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     CGFloat w = bounds.size.width, h = bounds.size.height;
     _field.frame = bounds;
     _field.backdropHeight = h;
+    _printed.frame = bounds;
     _ambient.frame = bounds;
     _motion.frame = bounds;
     _visualiser.frame = bounds;
@@ -391,6 +437,11 @@ static NSArray<NSString *> *backgroundNotes(void) {
 @implementation SGRPlayerPage {
     UIView *_header;
     UILabel *_note;
+    // The Fluid field, drawn by the shader. It sits over the table rather than inside the card: a Metal layer inside
+    // a view the page animates took the app down twice in -[CALayer superlayer], so the card keeps a plain field and
+    // this is laid over its frame as the table scrolls.
+    SGAmbientView *_overlay;
+    NSString *_overlayArtwork;
 }
 
 - (void)viewDidLoad {
@@ -406,6 +457,56 @@ static NSArray<NSString *> *backgroundNotes(void) {
     if (self.presets) [_header addSubview:self.presets];
     [self showNote];
     self.tableView.tableHeaderView = _header;
+
+    // The shader's field stays out of the page: a Metal layer in it took the app down in UIKit's own rendering
+    // (SIGSEGV under QuartzCore, from this page) three times. The card keeps its plain field.
+    if (NO && [SGAmbientView metalAmbientAvailable]) {
+        _overlay = [[SGAmbientView alloc] initWithFrame:CGRectZero];
+        if (_overlay) {
+            _overlay.followsFluid = YES;
+            _overlay.userInteractionEnabled = NO;
+            _overlay.layer.cornerRadius = kCardRadius;
+            _overlay.layer.cornerCurve = kCACornerCurveContinuous;
+            _overlay.clipsToBounds = YES;
+            _overlay.hidden = YES;
+            _overlay.alpha = 0.55;   // the card's cover and words are under it: the field shows through, not over
+            [self.view insertSubview:_overlay aboveSubview:self.tableView];
+
+        }
+    }
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(overlayArtworkChanged)
+                                               name:SGRNowPlayingArtworkDidChangeNotification object:nil];
+    // The field follows the card as the page scrolls, without taking the table's own delegate methods.
+    [self.tableView addObserver:self forKeyPath:@"contentOffset" options:NSKeyValueObservingOptionNew context:NULL];
+}
+
+// The card's frame in the page, held over it: the field is as tall as the card and is cut with it, and it goes away
+// with the card when the page scrolls it off or another background is picked.
+- (void)layoutOverlay {
+    if (!_overlay) return;
+    BOOL fluid = SGRPlayerBackground() == SGRPlayerBackgroundFluid;
+    CGRect frame = [self.showcase convertRect:self.showcase.bounds toView:self.view];
+    _overlay.frame = frame;
+    _overlay.hidden = !fluid || CGRectIsEmpty(CGRectIntersection(frame, self.view.bounds));
+    _overlay.moving = !_overlay.hidden && !SGPlayerState().isPaused;
+    if (!_overlay.hidden) [self.view bringSubviewToFront:_overlay];
+}
+
+// The colours the field is drawn in, from the cover playing: the palette's edge colour for the light and its field
+// colour for the shade, as the player's own background takes them.
+- (void)overlayArtworkChanged {
+    // The identity comes back through an autoreleasing out-parameter, which an ivar's address cannot be.
+    NSString *identity = nil;
+    UIImage *image = SGRNowPlayingArtwork(NULL, &identity);
+    if (!image || !_overlay) return;
+    _overlayArtwork = identity;
+    __weak SGRPlayerPage *weakSelf = self;
+    [SGRPalette paletteForImage:image request:(SGRPaletteRequest){0} completion:^(SGRPalette *palette) {
+        SGRPlayerPage *page = weakSelf;
+        if (!page || !palette.edgeColor) return;
+        page->_overlay.topColor = palette.edgeColor;
+        page->_overlay.bottomColor = palette.fieldColor ?: palette.edgeColor;
+    }];
 }
 
 - (void)showNote {
@@ -453,8 +554,23 @@ static NSArray<NSString *> *backgroundNotes(void) {
     table.tableHeaderView = _header;
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutOverlay];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ([keyPath isEqualToString:@"contentOffset"]) { [self layoutOverlay]; return; }
+    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+}
+
+- (void)dealloc {
+    [self.tableView removeObserver:self forKeyPath:@"contentOffset"];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self overlayArtworkChanged];
     // The player's ⋯ menu can switch Animated and Fluid while the page is away.
     self.backgrounds.artwork = SGRNowPlayingArtwork(NULL, NULL);
     [self.backgrounds setSelected:SGRPlayerBackground()];
@@ -465,6 +581,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 
 - (void)backgroundPicked:(NSInteger)index {
     SGSetInt(SGRKeyPlayerBackground, index);
+    [self layoutOverlay];
     [self.showcase reloadBackgroundAnimated:YES];
     [self showNote];
     [self refreshVisibility];
@@ -561,8 +678,10 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
 
-        SGSection(nil, @[SGWithSymbol(adjust, @"slider.horizontal.3")]),
-        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume),
+        SGSection(nil, @[adjust]),   // no symbol: a row with one is drawn as a tile, which took the page down
+        SGNotedSection(@"Buttons", @[SGShownRow(@"Video button", @"Switch to video from the cover", SGKeyHideVideoSwitch)],
+                       @"The video button appears over the cover while the song has a video."),
+        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume slider", @"A slider under the controls for this iPhone, or the speaker's", SGRKeyPlayerVolume),
                                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover),
                                       SGSwitchRow(@"Only the music", nil, SGRKeyPlayerZen)],
                        @"Volume puts a slider under the controls for this iPhone, or the speaker's while Spotify plays on another device. "

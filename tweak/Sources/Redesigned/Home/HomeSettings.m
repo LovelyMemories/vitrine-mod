@@ -246,16 +246,9 @@ UIViewController *SGRHomeSettingsPage(void) {
     // The Home look is a launch-time look: the running app keeps the design's layout while its cache holds,
     // so turning it off mid-session leaves Spotify half in the design. Store the switch and offer the restart,
     // the way the Redesigned UI switch does, rather than leaving the page half redesigned.
-    look.changed = ^(BOOL on) {
-        SGSetEnabled(SGRKeyHomeLook, on);
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Restart Spotify"
-            message:on ? @"The Home look comes back when Spotify starts again. Spotify closes now; open it again to see it."
-                      : @"Spotify's own Home comes back when Spotify starts again. Spotify closes now; open it again to see it."
-            preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Later" style:UIAlertActionStyleCancel handler:nil]];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Restart now" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { SGRestartSpotify(); }]];
-        [SGTopController() presentViewController:alert animated:YES completion:nil];
-    };
+    // The switch stores, and the page's own restart pill offers the restart: no alert of its own, which came up over
+    // the rows every time the switch moved.
+    look.changed = ^(BOOL on) { SGSetEnabled(SGRKeyHomeLook, on); };
     SGModRow *topPicks = SGRHomeTopPicksRow();
     topPicks.waitsOn = SGRKeyHomeLook;
     from.waitsOn = SGRKeyHomeTopPicks;

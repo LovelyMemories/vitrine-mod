@@ -107,7 +107,9 @@ static void style(UIView *button) {
     if ([identifier isEqualToString:@"Shortcut.Card.Home"]) {
         settle(button);
         SGRHomeStyleLargeCard(button);
-        CGFloat radius = SGRHomeLook() ? SGRHomeTileRadius : SGRRadiusCover;
+        // The card's own corners, not the cover's: a radius half the card's width turned these into half circles. The
+    // picture fills the card now and is cut by its corners.
+    CGFloat radius = SGRHomeLook() ? 14 : SGRRadiusCover;
         roundCorners(button, radius);
         if (button.superview.layer.cornerRadius > 0) roundCorners(button.superview, radius);
         SGRHomeStyleTile(button);

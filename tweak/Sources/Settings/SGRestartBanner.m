@@ -91,7 +91,17 @@ void SGRRestartBannerAttach(UIView *host) {
     CGRect bounds = host.bounds;
     CGFloat bottom = host.safeAreaInsets.bottom;
     CGFloat bars = 49 + 56;   // the tab bar, and the now playing bar in its row
-    sg_banner.frame = CGRectMake(16, CGRectGetHeight(bounds) - bottom - bars - 10 - 48, CGRectGetWidth(bounds) - 32, 48);
+    // Pinned by constraints rather than placed by arithmetic: the pill is where it belongs whatever the page's
+    // bounds, insets or scrolling do, and it does not shift by a point when they change.
+    sg_banner.translatesAutoresizingMaskIntoConstraints = NO;
+    [NSLayoutConstraint deactivateConstraints:sg_banner.constraints];
+    (void)bottom; (void)bars;
+    [NSLayoutConstraint activateConstraints:@[
+        [sg_banner.leadingAnchor constraintEqualToAnchor:host.leadingAnchor constant:16],
+        [sg_banner.trailingAnchor constraintEqualToAnchor:host.trailingAnchor constant:-16],
+        [sg_banner.heightAnchor constraintEqualToConstant:48],
+        [sg_banner.bottomAnchor constraintEqualToAnchor:host.safeAreaLayoutGuide.bottomAnchor constant:-115],
+    ]];
     sg_banner.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleWidth;
     [host bringSubviewToFront:sg_banner];
     [sg_banner setChanges:sg_changes];

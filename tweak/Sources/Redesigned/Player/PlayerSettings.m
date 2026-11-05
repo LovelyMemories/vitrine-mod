@@ -373,13 +373,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
     // A cross-fade of the whole card is a snapshot of its layer tree, and a Metal view's layer cannot be
     // snapshotted that way: with the ambient field in the card the change goes in plainly, and its colours and
     // rate change under the finger instead.
-    if (animated && self.window && !_ambient) {
-        // A crossfade, which Reduce Motion keeps: nothing moves.
-        [UIView transitionWithView:self duration:SGRCrossfade options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent
-                        animations:apply completion:nil];
-    } else {
-        apply();
-    }
+    // No cross-fade of the card: a transition snapshots its layer tree, and doing that while the field, the clip or
+    // the printed cover changes underneath took the app down in UIKit's rendering three times. The change goes in
+    // plainly, in one frame.
+    apply();
     [self setNeedsLayout];
 }
 

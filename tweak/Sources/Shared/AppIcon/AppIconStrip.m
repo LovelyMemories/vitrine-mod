@@ -140,14 +140,7 @@ static void setIcon(NSString *icon) {
     picture.tag = 1;
     [cell addSubview:picture];
 
-    UILabel *title = [UILabel new];
-    title.text = label(name);
-    title.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-    title.textColor = [UIColor colorWithWhite:1 alpha:0.6];
-    title.textAlignment = NSTextAlignmentCenter;
-    title.lineBreakMode = NSLineBreakByTruncatingTail;
-    title.tag = 2;
-    [cell addSubview:title];
+    // No name under the picture: the icons say what they are, and a strip of words under them read as clutter.
     cell.accessibilityLabel = label(name);
     [_run addSubview:cell];
     return cell;
@@ -169,15 +162,13 @@ static void setIcon(NSString *icon) {
     for (UIView *sub in _run.subviews) {
         if ([_cells indexOfObjectIdenticalTo:sub] == NSNotFound) [sub removeFromSuperview];
     }
-    CGFloat inset = 16, size = 46, labelHeight = 14, gap = 12;
+    CGFloat inset = 16, size = 46, labelHeight = 0, gap = 12;
     _run.frame = CGRectMake(0, inset, CGRectGetWidth(self.bounds), size + labelHeight + 4);
     CGFloat x = inset;
     for (UIView *cell in _cells) {
         cell.frame = CGRectMake(x, 0, size, size + labelHeight + 4);
         UIView *picture = [cell viewWithTag:1];
         picture.frame = CGRectMake(0, 0, size, size);
-        UIView *title = [cell viewWithTag:2];
-        title.frame = CGRectMake(-6, size + 4, size + 12, labelHeight);
         x += size + gap;
     }
     _run.contentSize = CGSizeMake(x + inset - gap, size + labelHeight + 4);
@@ -246,15 +237,6 @@ UIView *SGAppIconStrip(void) {
         picture.tag = 1;
         picture.userInteractionEnabled = NO;
         [cell addSubview:picture];
-        UILabel *title = [UILabel new];
-        title.text = label(_names[i]);
-        title.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-        title.textColor = [UIColor colorWithWhite:1 alpha:0.6];
-        title.textAlignment = NSTextAlignmentCenter;
-        title.lineBreakMode = NSLineBreakByTruncatingTail;
-        title.tag = 2;
-        title.userInteractionEnabled = NO;
-        [cell addSubview:title];
         cell.accessibilityLabel = label(_names[i]);
         [_scroll addSubview:cell];
         [_cells addObject:cell];
@@ -284,7 +266,7 @@ UIView *SGAppIconStrip(void) {
     CGRect bounds = self.view.bounds;
     CGFloat inset = 16, gap = 14, columns = 5;
     CGFloat cellWidth = floor((CGRectGetWidth(bounds) - 2 * inset - (columns - 1) * gap) / columns);
-    CGFloat cellHeight = cellWidth + 22;
+    CGFloat cellHeight = cellWidth + 8;
     _scroll.frame = bounds;
     // Below the navigation bar and clear of the home indicator: the cells were laid out under the bar, over the
     // back button.
@@ -296,7 +278,6 @@ UIView *SGAppIconStrip(void) {
         UIControl *cell = _cells[i];
         cell.frame = CGRectMake(x, y, cellWidth, cellHeight);
         [cell viewWithTag:1].frame = CGRectMake(0, 0, cellWidth, cellWidth);
-        [cell viewWithTag:2].frame = CGRectMake(-4, cellWidth + 4, cellWidth + 8, 16);
         x += cellWidth + gap;
         if ((i + 1) % (NSUInteger)columns == 0) { x = inset; y += cellHeight + gap; }
     }

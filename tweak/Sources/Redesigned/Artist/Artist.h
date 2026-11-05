@@ -34,3 +34,11 @@ BOOL SGRArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *following,
 
 // The page Mod Settings' list opens for Artists, built in Redesigned/Artist/ArtistSettings.m.
 UIViewController *SGRArtistSettingsPage(void);
+
+// The artist page's switches, read by its settings page in this branch.
+#define SGRKeyArtistLogo @"spotifyglass.redesign.artist.logo"
+#define SGRKeyArtistHideVideos @"spotifyglass.redesign.artist.hide.videos"
+#define SGRKeyArtistHideTabs @"spotifyglass.redesign.artist.hide.tabs"
+#define SGRKeyArtistHidePick @"spotifyglass.redesign.artist.hide.pick"
+#define SGRKeyArtistHideCountdown @"spotifyglass.redesign.artist.hide.countdown"
+#define SGRKeyArtistHideAbout @"spotifyglass.redesign.artist.hide.about"

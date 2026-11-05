@@ -66,11 +66,11 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 // veil on top; nothing once the page has been shown, so a page coming back is never held again.
 - (void)holdPage:(UIView *)page;
 - (void)showPage;
+
+// The colour the field prefers for its artwork, from the 0.51.0 tree: the album and artist pages set it.
+- (void)setPreferredColor:(UIColor *)color;
 @end
 
 // How long a page waits for its artwork before it is shown anyway. The Music app shows something at once
 // (HIG, Loading: "Show something as soon as possible"), so the wait is short; a page then loads as it used to.
 extern const NSTimeInterval SGRFieldHoldLimit;
-
-// The colour the field prefers for its artwork, from the 0.51.0 tree: the album and artist pages set it.
-- (void)setPreferredColor:(UIColor *)color;

@@ -406,9 +406,9 @@ const NSTimeInterval SGRFieldHoldLimit = 1.0;
     [self sgr_showPage:@"its artwork was read"];
 }
 
-@end
 
 - (void)setPreferredColor:(UIColor *)color {
     if (!color) return;
     self.backgroundColor = color;
 }
+@end

@@ -56,14 +56,12 @@ static UIImage *printedCover(UIImage *image) {
     UIImage *kept = [cache objectForKey:key];
     if (kept) return kept;
     CIImage *input = [CIImage imageWithCGImage:image.CGImage];
-    CIFilter *dither = [CIFilter filterWithName:@"CIDither"];
-    [dither setValue:input forKey:kCIInputImageKey];
-    [dither setValue:@0.7 forKey:@"inputIntensity"];
-    CIImage *dithered = dither.outputImage ?: input;
+    // Cut to a few levels and nothing else: the dither that came with it read as grain on a cover this size, which is
+    // not what the look wants.
     CIFilter *posterise = [CIFilter filterWithName:@"CIColorPosterize"];
-    [posterise setValue:dithered forKey:kCIInputImageKey];
-    [posterise setValue:@5 forKey:@"inputLevels"];
-    CIImage *out = posterise.outputImage ?: dithered;
+    [posterise setValue:input forKey:kCIInputImageKey];
+    [posterise setValue:@6 forKey:@"inputLevels"];
+    CIImage *out = posterise.outputImage ?: input;
     CGImageRef made = [context createCGImage:out fromRect:out.extent];
     UIImage *printed = made ? [UIImage imageWithCGImage:made scale:image.scale orientation:image.imageOrientation] : image;
     if (made) CGImageRelease(made);

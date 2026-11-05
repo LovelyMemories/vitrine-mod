@@ -164,7 +164,7 @@ static void setIcon(NSString *icon) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGFloat inset = 16, size = 60, labelHeight = 16, gap = 12;
+    CGFloat inset = 16, size = 46, labelHeight = 14, gap = 12;
     _run.frame = CGRectMake(0, inset, CGRectGetWidth(self.bounds), size + labelHeight + 4);
     CGFloat x = inset;
     for (UIView *cell in _cells) {
@@ -277,7 +277,7 @@ UIView *SGAppIconStrip(void) {
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     CGRect bounds = self.view.bounds;
-    CGFloat inset = 16, gap = 14, columns = 4;
+    CGFloat inset = 16, gap = 14, columns = 5;
     CGFloat cellWidth = floor((CGRectGetWidth(bounds) - 2 * inset - (columns - 1) * gap) / columns);
     CGFloat cellHeight = cellWidth + 22;
     _scroll.frame = bounds;

@@ -164,6 +164,11 @@ static void setIcon(NSString *icon) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
+    // A cell made before the names arrived is in the run but not in the list that lays cells out: it kept the frame it
+    // had and hung over the card under the strip. Anything the list does not know is removed here.
+    for (UIView *sub in _run.subviews) {
+        if ([_cells indexOfObjectIdenticalTo:sub] == NSNotFound) [sub removeFromSuperview];
+    }
     CGFloat inset = 16, size = 46, labelHeight = 14, gap = 12;
     _run.frame = CGRectMake(0, inset, CGRectGetWidth(self.bounds), size + labelHeight + 4);
     CGFloat x = inset;

@@ -1,4 +1,4 @@
-﻿// Home redesign: Top picks, the first shelf of cards drawn large the way the Music app draws its top shelf:
+// Home redesign: Top picks, the first shelf of cards drawn large the way the Music app draws its top shelf:
 // each card the cover edge to edge over a footer in the cover's color, 60% of the page wide so the next one
 // shows at the trailing edge.
 //

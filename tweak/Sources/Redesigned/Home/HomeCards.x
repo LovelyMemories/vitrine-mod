@@ -1,4 +1,4 @@
-﻿// Home redesign: every card Home keeps is the same Encore button, told apart where it lays out:
+// Home redesign: every card Home keeps is the same Encore button, told apart where it lays out:
 //   id=Shortcut.Card.Home          a shortcut tile 181x48 r=4 that clips, in a ConfigurableUIEventObservingView
 //                                  r=4 (trees/clean/home/01.txt:36-37): the cover radius, continuous, and its
 //                                  picture run across it (HomeTiles.m)

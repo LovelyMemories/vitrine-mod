@@ -1,24 +1,24 @@
 // Album redesign: the artwork field behind the whole page, and what the switch forces.
 //
 // Tree (trees/clean/album/01.txt:22). The page is CreativeWorkPlatform.CreativeWorkTemplateView, and it
-// holds, in this order: the header's color wash (a LegacyUI HeaderView the height of the header, with
+// holds, in this order: the header's colour wash (a LegacyUI HeaderView the height of the header, with
 // Spotify's GradientView in it), CreativeWorkPlatform.Tab with the scrolling list inside it, the sticky
 // HeaderNavigationBar, and the two controls Spotify floats over the page, shuffle and play. Nothing of it
 // scrolls except what is inside the Tab, so a field put behind the lot stays still while the cover at the
-// top of the header slides up over it -- which is what the Music app does with the page color.
+// top of the header slides up over it -- which is what the Music app does with the page colour.
 //
 // So the field is the page's bottom-most view, the size of the view and bleeding past it, with no backdrop
 // of its own: the sharp cover at the top of the header is the picture, and AlbumHeader.x fades it into
-// exactly this field's color, and conceals Spotify's wash so the field is what shows. What Spotify paints
+// exactly this field's colour, and conceals Spotify's wash so the field is what shows. What Spotify paints
 // over the field -- the list and every row, all of them the base surface -- is kept clear by the Kit's
 // repaint hook while sgr_albumRoot is this page, and by the list's own pass below, which paints itself
 // rather than through a layer the repaint hook would hear about.
 //
-// The color is the cover's main color, as the playlist's and the artist's are. Read off the bottom edge
-// it was a scanned cover's pale border, which turned the field gray where the cover is blue (device,
-// 2026-09-18); for a while Spotify's own color, read off the wash it paints behind the header, won over
-// it for that reason. That color is now only what shows until the cover has been read (AlbumHeader.x
-// hands it over as it conceals the wash), and before either the field is the neutral one.
+// The colour is Spotify's own for the album, read off the wash it paints behind the header, which
+// AlbumHeader.x hands over as it conceals it. Spotify reads the whole cover; the Kit's palette reads its
+// bottom edge, and a scanned cover's bottom edge is the scanner's pale border, which turned the field grey
+// where Spotify had it blue (device, 2026-09-18). The colour read from the cover is what shows until
+// Spotify's arrives, or for good if it never does, and before either the field is the neutral one.
 //
 // The page is the album's by its identifier, which is how Native/Album/Album.x has told it apart since it
 // shipped: the artist page is TemplateKit's TemplateView instead. A podcast's episode page is built from
@@ -40,57 +40,22 @@ static char kFieldKey;
 
 #pragma mark - the page
 
-// Where a cell of a list is: the page it is on, and whether it is a row of the page's own list rather than a card
-// inside one of its carousels -- a card is a cell of the same class, and the row that carries the carousel decides
-// for it (Artist/ArtistSections.x). Worked out once the cell is in a window and kept on it, since a cell never
-// leaves its list nor the list its page; every cell of the class asks on every pass, Home's and Search's included.
-@interface SGRAlbumPlace : NSObject
-@property (nonatomic, weak) UIView *page;
-@property (nonatomic) BOOL pageCell;
-// pagesFound when no page was found: a cell measured before Spotify names its page looks again once one turns up.
-@property (nonatomic) NSInteger pagesFound;
-@end
-
-@implementation SGRAlbumPlace
-@end
-
-static char kPlaceKey;
-static NSInteger pagesFound;
-static __weak UIView *lastPage;
-
-static SGRAlbumPlace *placeOf(UIView *cell) {
-    SGRAlbumPlace *place = objc_getAssociatedObject(cell, &kPlaceKey);
-    if (place.page || (place && place.pagesFound == pagesFound)) return place;
-    place = [SGRAlbumPlace new];
-    BOOL nested = NO;
-    for (UIView *v = cell; v; v = v.superview) {
-        if (v != cell && [v isKindOfClass:UICollectionViewCell.class]) nested = YES;
-        if ([v.accessibilityIdentifier isEqualToString:kPageIdentifier]) {
-            place.page = v;
-            place.pageCell = !nested;
-            break;
-        }
-    }
-    if (place.page && place.page != lastPage) {
-        lastPage = place.page;
-        pagesFound++;
-    }
-    place.pagesFound = pagesFound;
-    if (cell.window) objc_setAssociatedObject(cell, &kPlaceKey, place, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return place;
-}
-
 UIView *SGRAlbumPageOf(UIView *view) {
-    if ([view isKindOfClass:UICollectionViewCell.class]) return placeOf(view).page;
     for (UIView *v = view; v; v = v.superview) {
         if ([v.accessibilityIdentifier isEqualToString:kPageIdentifier]) return v;
     }
     return nil;
 }
 
+// A cell of the page's own list rather than a card inside one of its carousels: a card is a cell of the
+// same class, and the row that carries the carousel decides for it (Artist/ArtistSections.x). So the walk
+// up to the page stops at the first cell it meets on the way.
 static BOOL isPageCell(UIView *cell) {
-    SGRAlbumPlace *place = placeOf(cell);
-    return place.pageCell && place.page;
+    for (UIView *v = cell.superview; v; v = v.superview) {
+        if ([v isKindOfClass:UICollectionViewCell.class]) return NO;
+        if ([v.accessibilityIdentifier isEqualToString:kPageIdentifier]) return YES;
+    }
+    return NO;
 }
 
 #pragma mark - the page's field
@@ -113,11 +78,7 @@ void SGRAlbumSetArtwork(UIView *view, UIImage *image) {
 }
 
 void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color) {
-    if (color) [fieldOn(view) setProvisionalColor:color];
-}
-
-void SGRAlbumHoldPage(UIView *page) {
-    [fieldOn(page) holdPage:page];
+    if (color) [fieldOn(view) setPreferredColor:color];
 }
 
 static SGRArtworkField *fieldIn(UIView *page) {
@@ -125,7 +86,6 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (field) return field;
     field = [[SGRArtworkField alloc] initWithFrame:page.bounds];
     field.bleed = kBleed;
-    field.mainColor = YES;
     objc_setAssociatedObject(page, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     SGLog(@"redesign album: field on the page %.0fx%.0f", page.bounds.size.width, page.bounds.size.height);
     return field;
@@ -161,18 +121,6 @@ static SGRArtworkField *fieldIn(UIView *page) {
 }
 %end
 
-// An album card of a discovery section switched back on (More by, You might also like) paints the base surface
-// behind its caption, a black box on the field. Only the card's own paint goes: its artwork, badges and
-// placeholder are views of their own. Spotify paints it before the card is attached, so no color hook hears it;
-// it is cleared on the pass of the cell it is in, which a card has to itself when it is reused.
-static void clearCards(UIView *cell) {
-    SGForEachView(cell, ^(UIView *v) {
-        if (![v.accessibilityIdentifier isEqualToString:@"Components.UI.ContentCardAlbum"]) return;
-        CGColorRef color = v.layer.backgroundColor;
-        if (color && SGIsBaseSurface(color)) v.backgroundColor = UIColor.clearColor;
-    });
-}
-
 // Every cell of the list paints the base surface too, and the repaint hook misses it: a cell is painted
 // before it is inside the page, and a reused one brings its old paint with it. On the episode page the
 // Episode Transcript row, the empty section under it and the rule under that sat on black bands (device,
@@ -182,7 +130,6 @@ static void clearCards(UIView *cell) {
     %orig;
     UIView *cell = (UIView *)self;
     if (isPageCell(cell)) SGRClearCellPaint(cell);
-    if (SGRAlbumPageOf(cell)) clearCards(cell);
 }
 %end
 

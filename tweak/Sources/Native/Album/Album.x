@@ -21,6 +21,14 @@ static UIView *albumPageOf(UIView *view) {
     return nil;
 }
 
+static UIView *identNamed(UIView *root, NSString *ident) {
+    __block UIView *found = nil;
+    SGForEachView(root, ^(UIView *v) {
+        if (!found && [v.accessibilityIdentifier hasPrefix:ident]) found = v;
+    });
+    return found;
+}
+
 #pragma mark - header buttons
 
 static const struct { __unsafe_unretained NSString *ident, *key; } buttons[] = {
@@ -38,38 +46,34 @@ static NSString *keyFor(UIView *action) {
     return nil;
 }
 
-static BOOL buttonHidden(UIView *action) {
-    NSString *key = keyFor(action);
-    return key && SGHidden(key);
-}
-
 // The buttons arrive after the page has laid out, and a row that keeps its size lays nothing else out.
 %hook UIStackView
 - (void)layoutSubviews {
     %orig;
-    BOOL any = NO;
+    BOOL row = NO;
     for (UIView *action in self.subviews) {
-        if ((any = buttonHidden(action))) break;
+        if (keyFor(action)) row = YES;
     }
-    if (!any || !albumPageOf(self)) return;
+    if (!row || !albumPageOf(self)) return;
     for (UIView *action in self.subviews) {
-        if (buttonHidden(action)) action.hidden = YES;
+        NSString *key = keyFor(action);
+        if (key && SGHidden(key)) action.hidden = YES;
     }
 }
 %end
 
 #pragma mark - the cover behind the header
 
-static char kBackdropKey, kSourceKey, kArtworkKey;
+static char kBackdropKey, kSourceKey;
 
 static void applyBackdrop(UIView *page) {
     if (!SGFlag(SGKeyAlbumBackdrop, NO)) return;
     __block UIImage *image = nil;
-    SGForEachView(SGFindIdentifier(page, @"CreativeWorkPlatform.Components.UI.ArtWorkElement.WithCoverArt", &kArtworkKey), ^(UIView *v) {
+    SGForEachView(identNamed(page, @"CreativeWorkPlatform.Components.UI.ArtWorkElement.WithCoverArt"), ^(UIView *v) {
         if (!image && [v isKindOfClass:UIImageView.class]) image = ((UIImageView *)v).image;
     });
     UIView *header = page.subviews.firstObject;
-    if (!image || !SGClassNamed(header.class, @"HeaderView")) return;
+    if (!image || ![NSStringFromClass(header.class) containsString:@"HeaderView"]) return;
 
     UIView *backdrop = objc_getAssociatedObject(header, &kBackdropKey);
     if (!backdrop) {
@@ -136,7 +140,7 @@ static NSString *headingIn(UIView *cell) {
     SGForEachView(cell, ^(UIView *v) {
         if (title) return;
         if ([v.accessibilityIdentifier isEqualToString:@"Album.Copyright"]) title = v.accessibilityIdentifier;
-        else if (SGClassNamed(v.class, @"SectionHeadingHome") && v.accessibilityLabel.length) title = v.accessibilityLabel;
+        else if (v.accessibilityLabel.length && [NSStringFromClass(v.class) containsString:@"SectionHeadingHome"]) title = v.accessibilityLabel;
     });
     return title ?: @"";
 }

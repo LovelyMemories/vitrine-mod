@@ -1,6 +1,6 @@
 // Album redesign: the header the Music app gives an album (iOS 26.4), the same one the playlist redesign
 // gives a playlist. The cover runs full bleed across the top of the page and dissolves into the page's
-// color; the title, the artist and the kind and date are centered on the bottom of that dissolve; and under
+// colour; the title, the artist and the kind and date are centred on the bottom of that dissolve; and under
 // them one row -- shuffle, a white Play capsule, and add.
 //
 // Tree (trees/clean/album/01.txt:39-152). The header is one element of the page's scrolling stack,
@@ -24,10 +24,8 @@
 // Play and shuffle are not in the header. The album page floats them over the page, pinned to the top
 // trailing corner outside the scroll (01.txt:1431, :1436): they are concealed where they are, and the row
 // draws them and fires them all the same.
-#import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Album.h"
 
 // How much of the cover's height the dissolve into the field covers, and the scrim over the top of it that
@@ -114,28 +112,19 @@ static void watch(UIView *view, const void *key, void (^laidOut)(UIView *view)) 
 
 // The picture across the top of the page with the field showing through the bottom of it. Two gradients
 // rather than a mask or a blur: a scrim over the top for the status bar, and under it a fade from the
-// picture to the very color the page's field is drawing, so the two meet with nothing to see.
+// picture to the very colour the page's field is drawing, so the two meet with nothing to see.
 @interface SGRAlbumHero : UIView
 @property (nonatomic, readonly) UIImageView *picture;
 @property (nonatomic, copy) UIColor *fieldColor;
-// The cover in Spotify's artwork view, and every cover it puts there afterward: the hero keeps itself
+// The cover in Spotify's artwork view, and every cover it puts there afterwards: the hero keeps itself
 // right, rather than being handed a picture on each of the header's passes and staying empty between them.
 - (void)followCover:(UIImageView *)source;
-// Apple Music's animated cover over the picture, where the album has one. The same album again is a no-op.
-- (void)playMotionForArtist:(NSString *)artist album:(NSString *)album;
 @end
 
 @implementation SGRAlbumHero {
     CAGradientLayer *_scrim, *_dissolve;
     __weak UIImageView *_cover;
-    UIView *_extension;   // iOS 26's UIBackgroundExtensionView around the picture, nil before it
-    NSString *_motionAlbum;
-    AVPlayerLayer *_motion;
-    AVQueuePlayer *_player;
-    AVPlayerLooper *_looper;
 }
-
-static void *kReadyContext = &kReadyContext;
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
@@ -146,19 +135,8 @@ static void *kReadyContext = &kReadyContext;
     _picture = [[UIImageView alloc] initWithFrame:self.bounds];
     _picture.contentMode = UIViewContentModeScaleAspectFill;
     _picture.clipsToBounds = YES;
-    // The cover is square and the hero runs a little taller, so a fill cut its sides: a title set edge to
-    // edge on the cover lost its ends. On iOS 26 the cover stays whole at the top and the system carries its
-    // bottom edge down the rest, as the Music app's album page does; before, it fills as it always did.
-    Class extension = NSClassFromString(@"UIBackgroundExtensionView");
-    if (extension) {
-        _extension = [[extension alloc] initWithFrame:self.bounds];
-        [_extension setValue:@NO forKey:@"automaticallyPlacesContentView"];
-        [_extension setValue:_picture forKey:@"contentView"];
-        [self addSubview:_extension];
-    } else {
-        _picture.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [self addSubview:_picture];
-    }
+    _picture.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self addSubview:_picture];
 
     _scrim = [CAGradientLayer layer];
     _scrim.zPosition = 1;
@@ -169,20 +147,14 @@ static void *kReadyContext = &kReadyContext;
     _dissolve.zPosition = 2;
     [self.layer addSublayer:_dissolve];
     self.fieldColor = SGRNeutralField();
-    // The color is read off the main thread, so it can land after the last layout pass of the page.
-    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
-    [center addObserver:self selector:@selector(sgr_fieldColorDidChange) name:SGRFieldColorDidChangeNotification object:nil];
-    for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, UIApplicationWillResignActiveNotification,
-                                      NSProcessInfoPowerStateDidChangeNotification, UIAccessibilityReduceMotionStatusDidChangeNotification,
-                                      UIAccessibilityVideoAutoplayStatusDidChangeNotification]) {
-        [center addObserver:self selector:@selector(sgr_updateMotionSoon) name:name object:nil];
-    }
+    // The colour is read off the main thread, so it can land after the last layout pass of the page.
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(sgr_fieldColorDidChange)
+                                               name:SGRFieldColorDidChangeNotification object:nil];
     return self;
 }
 
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
-    [self sgr_dropMotion];
 }
 
 - (void)sgr_fieldColorDidChange {
@@ -192,8 +164,8 @@ static void *kReadyContext = &kReadyContext;
 - (void)setFieldColor:(UIColor *)color {
     if (!color || [_fieldColor isEqual:color]) return;
     _fieldColor = [color copy];
-    // The clear end is the same color with no alpha rather than +clearColor, so the fade keeps its hue
-    // instead of going through gray.
+    // The clear end is the same colour with no alpha rather than +clearColor, so the fade keeps its hue
+    // instead of going through grey.
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _dissolve.colors = @[(id)[color colorWithAlphaComponent:0].CGColor,
@@ -208,108 +180,10 @@ static void *kReadyContext = &kReadyContext;
     CGRect bounds = self.bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    if (_extension) {
-        _extension.frame = bounds;
-        CGFloat side = MIN(bounds.size.width, bounds.size.height);
-        _picture.frame = CGRectMake(0, 0, bounds.size.width, side);
-    }
-    _motion.frame = bounds;
     _scrim.frame = CGRectMake(0, 0, bounds.size.width, MIN(kTopScrim, bounds.size.height));
     CGFloat fade = round(bounds.size.height * kDissolve);
     _dissolve.frame = CGRectMake(0, bounds.size.height - fade, bounds.size.width, fade);
     [CATransaction commit];
-}
-
-- (void)playMotionForArtist:(NSString *)artist album:(NSString *)album {
-    NSString *key = artist.length && album.length ? [NSString stringWithFormat:@"%@\n%@", artist, album] : nil;
-    if (!key || [key isEqualToString:_motionAlbum] || !SGEnabled(SGRKeyAlbumMotion) || !SGMotionAppleMusicOn()) return;
-    _motionAlbum = key;
-    // The player's size: at the screen's full width a square cover ran to the 1920 stream, tens of MB.
-    CGFloat pixels = SGMotionPixels();
-    __weak SGRAlbumHero *weakSelf = self;
-    // Tall, as the Music app's album page: the hero runs past the title, taller than wide, and a square clip
-    // filled into it lost its sides. An album with only a square clip gets that one.
-    SGMotionAlbumCover(artist, album, SGMotionTall, pixels, ^(NSURL *file) {
-        SGRAlbumHero *hero = weakSelf;
-        if (hero && file && [hero->_motionAlbum isEqualToString:key]) [hero showMotion:file];
-    });
-}
-
-// Muted and looping, over the picture and under the two gradients. The picture stays under it until the
-// first frame is decoded, and only then does the clip fade in: a fade started at once was spent on a layer
-// with nothing in it, and the clip cut in after it.
-- (void)showMotion:(NSURL *)file {
-    AVPlayerItem *item = [AVPlayerItem playerItemWithURL:file];
-    _player = [AVQueuePlayer new];
-    _player.muted = YES;
-    _player.preventsDisplaySleepDuringVideoPlayback = NO;
-    // A file on the phone: nothing to buffer against, so it starts as soon as it can.
-    _player.automaticallyWaitsToMinimizeStalling = NO;
-    _looper = [AVPlayerLooper playerLooperWithPlayer:_player templateItem:item];
-    [self sgr_dropMotion];
-    _motion = [AVPlayerLayer playerLayerWithPlayer:_player];
-    _motion.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    _motion.zPosition = 0.5;
-    _motion.frame = self.bounds;
-    _motion.opacity = 0;
-    [self.layer addSublayer:_motion];
-    [_motion addObserver:self forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionInitial context:kReadyContext];
-    [self sgr_updateMotion];
-    SGLog(@"redesign album: animated cover %@", file.lastPathComponent);
-}
-
-- (void)sgr_dropMotion {
-    [_motion removeObserver:self forKeyPath:@"readyForDisplay" context:kReadyContext];
-    [_motion removeFromSuperlayer];
-    _motion = nil;
-}
-
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if (context != kReadyContext) {
-        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
-        return;
-    }
-    __weak SGRAlbumHero *weakSelf = self;
-    dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf sgr_fadeInMotion:object]; });
-}
-
-// Once, when the clip has a frame to show: over 0.2 s on a curve most of the way there at once (the Kit's response,
-// an entrance being quick), on screen; at once off it.
-- (void)sgr_fadeInMotion:(AVPlayerLayer *)layer {
-    if (layer != _motion || !layer.readyForDisplay || layer.opacity == 1) return;
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    layer.opacity = 1;
-    if (self.window) {
-        CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"opacity"];
-        fade.fromValue = @0;
-        fade.toValue = @1;
-        fade.duration = 0.2;
-        fade.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.23 :1 :0.32 :1];
-        [layer addAnimation:fade forKey:@"fade"];
-    }
-    [CATransaction commit];
-}
-
-// The power state is reported off the main thread.
-- (void)sgr_updateMotionSoon {
-    dispatch_async(dispatch_get_main_queue(), ^{ [self sgr_updateMotion]; });
-}
-
-// The clip moves under the conditions the player's does (Player/PlayerMotion.x), and only with Auto-Play
-// Video Previews on; otherwise it holds its frame. Off screen it stops: an album page left on the
-// navigation stack would otherwise keep decoding.
-- (void)sgr_updateMotion {
-    BOOL front = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
-    BOOL may = self.window && front && !SGRReduceMotion() && !NSProcessInfo.processInfo.lowPowerModeEnabled
-            && UIAccessibilityIsVideoAutoplayEnabled();
-    if (may) [_player play];
-    else [_player pause];
-}
-
-- (void)didMoveToWindow {
-    [super didMoveToWindow];
-    [self sgr_updateMotion];
 }
 
 - (void)followCover:(UIImageView *)source {
@@ -328,7 +202,7 @@ static void *kReadyContext = &kReadyContext;
     UIImage *image = source.image;
     if (!image || source.bounds.size.width < kMinCover || _picture.image == image) return;
     _picture.image = image;
-    // The page's field takes its color from the same picture.
+    // The page's field takes its colour from the same picture.
     SGRAlbumSetArtwork(self, image);
     static BOOL logged;
     if (late && !logged) {
@@ -354,7 +228,7 @@ static UIImageView *coverImageIn(UIView *cover) {
 }
 
 // The picture runs from the top of the header down past where its text begins, so the title and the artist
-// sit on the bottom of its dissolve; below that the page's field is already drawing the very color the
+// sit on the bottom of its dissolve; below that the page's field is already drawing the very colour the
 // picture dissolves into, so there is no seam to see.
 //
 // `bottom` is taken from the header at rest, never from where it is mid scroll, and only ever grows: a header
@@ -420,7 +294,7 @@ static NSString *metadataText(UIView *metadata) {
 static void applyHeader(UIView *header, UIView *page);
 
 // The Kit's view over the whole header, its content on the header's bottom edge; Spotify's own column goes.
-static SGRHeaderInfo *applyInfo(UIView *header, UIView *page, NSString **artist, NSString **album) {
+static SGRHeaderInfo *applyInfo(UIView *header, UIView *page) {
     SGRHeaderInfo *info = objc_getAssociatedObject(header, &kInfoKey);
     if (!info) {
         info = [[SGRHeaderInfo alloc] initWithFrame:CGRectZero];
@@ -435,22 +309,11 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page, NSString **artist,
     setFrame(info, header.bounds);
 
     UIView *title = SGRFindByIdentifier(header, @"CreativeWorkPlatform.Components.UI.TitleRow", &kTitleKey);
-    // Spotify's header grows and shrinks as its Play turns to Pause (issue #25), its title row does not.
-    if (title.window) {
-        CGFloat top = [title convertRect:title.bounds toView:header].origin.y;
-        if (fabs(top - info.pinnedTop) > 0.5) {
-            info.pinnedTop = top;
-            [info setNeedsLayout];
-        }
-    }
     UIView *parent = SGRFindByIdentifier(header, @"CreativeWorkPlatform.Components.UI.ParentRow", &kParentKey);
     UIView *metadata = SGRFindByIdentifier(header, @"Components.UI.MetadataRow", &kMetaKey);
-    NSString *length = metadataText(metadata), *line = firstText(parent);
-    *album = firstText(title);
-    *artist = line ?: trimmed(parent.accessibilityLabel);
-    [info showTitle:*album creator:*artist length:length about:nil];
-    // The line as it reads, without the accessibility label to fall back on: no line, no row loses its artist.
-    SGRAlbumSetArtist(page, line);
+    NSString *length = metadataText(metadata);
+    [info showTitle:firstText(title) creator:firstText(parent) ?: trimmed(parent.accessibilityLabel)
+             length:length about:nil];
     // The kind and the date are cells the metadata row's collection view makes on its own pass, after the
     // header's, and nothing lays the header out again when they arrive; the collection is Spotify's own Swift
     // class, which cannot be watched. So an empty row is read again a moment later, a few times at most.
@@ -467,10 +330,6 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page, NSString **artist,
     // whole line however many artists are on the album, so several of them open Spotify's own picker
     // (issue #56).
     [info showCreatorLink:parent];
-    // And the artist's picture before the name, the one Spotify draws at the start of the row -- unless the page's
-    // Artist picture switch is off. Read here rather than at launch: the header is laid out again on every pass, so
-    // the switch takes effect as it is flipped.
-    [info showCreatorPicture:SGEnabled(SGRKeyAlbumArtistPicture) ? SGRCreatorPicture(parent) : nil];
 
     // More, pinned over the page rather than left in the header, which is blanked and scrolls away.
     SGRPinnedMore(page, &kPinnedMoreKey, SGRFindByIdentifier(header, @"Components.UI.ContextMenuButton*", &kMoreKey));
@@ -500,7 +359,7 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page, NSString **artist,
     if (!logged && header.window && title) {
         logged = YES;
         SGLog(@"redesign album: own block \"%@\" by %@, \"%@\"; shuffle %@, play %@, %@", firstText(title),
-              firstText(parent) ?: trimmed(parent.accessibilityLabel) ?: @"nobody", metadataText(metadata) ?: @"no metadata", shuffle ? @"found" : @"missing",
+              firstText(parent) ?: @"nobody", metadataText(metadata) ?: @"no metadata", shuffle ? @"found" : @"missing",
               play ? @"found" : @"missing", add ? @"add" : (download ? @"download" : @"nothing on the right"));
     }
     return info;
@@ -517,9 +376,9 @@ static void maskOut(UIView *view) {
     view.accessibilityElementsHidden = YES;
 }
 
-// The color Spotify painted the wash in: the first opaque color of the gradient layer it draws with,
+// The colour Spotify painted the wash in: the first opaque colour of the gradient layer it draws with,
 // whether that is the view's own layer or one under it. nil when it draws some other way, or has
-// no color yet.
+// no colour yet.
 static UIColor *washColorOf(UIView *gradient) {
     NSMutableArray<CALayer *> *layers = [NSMutableArray arrayWithObject:gradient.layer];
     [layers addObjectsFromArray:gradient.layer.sublayers ?: @[]];
@@ -528,7 +387,7 @@ static UIColor *washColorOf(UIView *gradient) {
         for (id value in ((CAGradientLayer *)layer).colors) {
             CGColorRef cg = (__bridge CGColorRef)value;
             if (CFGetTypeID(cg) != CGColorGetTypeID() || CGColorGetAlpha(cg) < 0.5) continue;
-            // The page's base surface is what a wash is before Spotify has a color for it, not a color.
+            // The page's base surface is what a wash is before Spotify has a colour for it, not a colour.
             if (SGIsBaseSurface(cg)) return nil;
             return [UIColor colorWithCGColor:cg];
         }
@@ -536,8 +395,8 @@ static UIColor *washColorOf(UIView *gradient) {
     return nil;
 }
 
-// Spotify's color wash behind the header goes, so the page's field shows through, and the color it was
-// painted in goes to the field, to show until the cover's own main color has been read.
+// Spotify's colour wash behind the header goes, so the page's field shows through, and the colour it was
+// painted in goes to the field: Spotify reads the whole cover for it, where the Kit reads the bottom edge.
 //
 // The navigation bar's gradient goes too. Hidden at rest, it is shown as the page scrolls under the
 // title, and over the field it was a flat dark band across the top (device, 2026-09-18). What keeps the
@@ -555,7 +414,7 @@ static void applyWash(UIView *page) {
                 static BOOL logged;
                 if (!logged) {
                     logged = YES;
-                    SGLog(@"redesign album: Spotify's wash %@ on %@, color %@", NSStringFromClass(v.class),
+                    SGLog(@"redesign album: Spotify's wash %@ on %@, colour %@", NSStringFromClass(v.class),
                           NSStringFromClass(v.layer.class), color ?: @"not found");
                 }
                 SGRAlbumSetSpotifyColor(page, color);
@@ -567,10 +426,8 @@ static void applyWash(UIView *page) {
 
 static void applyHeader(UIView *header, UIView *page) {
     if (!SGRFindByIdentifier(header, @"CreativeWorkPlatform.Components.UI.TitleRow", &kTitleKey)) return;
-    SGRAlbumHoldPage(page);
     applyWash(page);
-    NSString *artist, *album;
-    SGRHeaderInfo *info = applyInfo(header, page, &artist, &album);
+    SGRHeaderInfo *info = applyInfo(header, page);
 
     // The picture reaches to where the content's top is at rest, plus the title and the artist. The header at
     // rest is the tallest it has been, so the picture does not change size as the header loads or scrolls.
@@ -579,8 +436,6 @@ static void applyHeader(UIView *header, UIView *page) {
     CGFloat bottom = rest - SGRHeaderInfoBottom - [info contentHeightForWidth:header.bounds.size.width] + SGRHeaderInfoTitleRise;
     UIView *cover = SGRFindByIdentifier(header, @"CreativeWorkPlatform.Components.UI.ArtWorkElement.WithCoverArt", &kCoverKey);
     if (cover) applyHero(header, cover, bottom);
-    SGRAlbumHero *hero = objc_getAssociatedObject(header, &kHeroKey);
-    [hero playMotionForArtist:artist album:album];
 }
 
 static void applyPage(UIView *page) {

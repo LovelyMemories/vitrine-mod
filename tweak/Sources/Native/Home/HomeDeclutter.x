@@ -14,44 +14,30 @@ static const struct { __unsafe_unretained NSString *marker, *key; } sections[] =
     {@"Discovery_DJElement", SGHideHomeDJ},
 };
 
-enum { kSections = sizeof(sections) / sizeof(sections[0]) };
-
-static BOOL anySectionSwitch(void) {
-    for (size_t i = 0; i < kSections; i++) {
-        if (SGHidden(sections[i].key)) return YES;
-    }
-    return NO;
-}
-
-// Whether the cell is a section of Home: its first view names the page. Spotify's cell has held it as its own
-// first subview (Redesigned/Home/HomeSections.x) and as its content view's (Native/Player/PlayerDeclutter.x).
-static BOOL onHome(UICollectionViewCell *cell) {
-    return SGClassNamed(cell.subviews.firstObject.class, @"Home_EvoPageImpl")
-        || SGClassNamed(cell.contentView.subviews.firstObject.class, @"Home_EvoPageImpl");
-}
-
-// The first switched-on section a class in the cell names. Lists nested in the cell are laid out first so
-// the cells that name the section (shortcut tiles) exist.
-static NSString *switchedSectionIn(UIView *cell) {
-    unsigned hidden = 0;   // a bit per switched-on section (a block cannot capture an array)
-    for (size_t i = 0; i < kSections; i++) if (SGHidden(sections[i].key)) hidden |= 1u << i;
-    __block size_t first = kSections;
+// Class names of everything in the cell. Lists nested in the cell are laid out first so the
+// cells that name the section (shortcut tiles) exist.
+static NSString *classNamesIn(UIView *cell) {
+    NSMutableString *names = [NSMutableString string];
     SGForEachView(cell, ^(UIView *v) {
         if (v != cell && [v isKindOfClass:UICollectionView.class]) [v layoutIfNeeded];
-        for (size_t i = 0; i < first; i++) {
-            if ((hidden & 1u << i) && SGClassNamed(v.class, sections[i].marker)) first = i;
-        }
+        [names appendString:NSStringFromClass(v.class)];
+        [names appendString:@"\n"];
     });
-    return first < kSections ? sections[first].key : nil;
+    return names;
 }
 
 static NSString *hiddenKeyFor(UICollectionViewCell *cell) {
-    if (!anySectionSwitch() || !onHome(cell)) return nil;
     // A cell inside another section's list: the outer section decides.
     for (UIView *v = cell.superview; v; v = v.superview) {
         if ([v isKindOfClass:cell.class]) return nil;
     }
-    return switchedSectionIn(cell);
+    NSString *names = nil;
+    for (size_t i = 0; i < sizeof(sections) / sizeof(sections[0]); i++) {
+        if (!SGHidden(sections[i].key)) continue;
+        if (!names) names = classNamesIn(cell);
+        if ([names containsString:@"Home_EvoPageImpl"] && [names containsString:sections[i].marker]) return sections[i].key;
+    }
+    return nil;
 }
 
 %hook _TtC12Element_List18CollectionViewCell

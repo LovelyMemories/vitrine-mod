@@ -38,3 +38,13 @@ void SGRAlbumSetSpotifyColor(UIView *view, UIColor *color);
 
 // The page Mod Settings' list opens for Albums, built in Redesigned/Album/AlbumSettings.m.
 UIViewController *SGRAlbumSettingsPage(void);
+// The album page's switches, read by its settings page in this branch (Redesigned/Album/AlbumSettings.m).
+#define SGRKeyAlbumMotion @"spotifyglass.redesign.album.motion"
+#define SGRKeyAlbumHideMoreBy @"spotifyglass.redesign.album.hide.moreBy"
+#define SGRKeyAlbumHideVideos @"spotifyglass.redesign.album.hide.videos"
+#define SGRKeyAlbumHideConcerts @"spotifyglass.redesign.album.hide.concerts"
+#define SGRKeyAlbumHideMerch @"spotifyglass.redesign.album.hide.merch"
+#define SGRKeyAlbumHideYouMightLike @"spotifyglass.redesign.album.hide.youMightLike"
+#define SGRKeyAlbumHideOther @"spotifyglass.redesign.album.hide.other"
+#define SGRKeyAlbumHideTrackArtists @"spotifyglass.redesign.album.hide.trackArtists"
+#define SGRKeyAlbumArtistPicture @"spotifyglass.redesign.album.artistPicture"
